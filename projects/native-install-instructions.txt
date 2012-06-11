@@ -24,4 +24,12 @@ sudo update-alternatives --install "/usr/bin/java" "java" "/usr/lib/jvm/jdk1.7.0
 sudo update-alternatives --install "/usr/bin/javac" "javac" "/usr/lib/jvm/jdk1.7.0/bin/javac" 1
 sudo update-alternatives --install "/usr/bin/javaws" "javaws" "/usr/lib/jvm/jdk1.7.0/bin/javaws" 1
 sudo update-alternatives --config java 
-// Select your new installation, do the same for javac and javaws
+/* Select your new installation, do the same for javac and javaws */
+sudo vim /etc/bash.bashrc
+/* Here you need to set your classpath. Add the following lines:
+ * JAVA_HOME=/usr/lib/jvm/jdk1.7.0
+ * export JAVA_HOME
+ * PATH=$PATH:$JAVA_HOME/bin
+ * export PATH
+ */
+ 
