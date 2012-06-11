@@ -108,12 +108,12 @@ PROCESS_THREAD(shell_broadcast_hi_process, ev, data)
         leds_off(LEDS_ALL);
 
 	etimer_set(&etimer, random(5) * CLOCK_SECOND + random(5) * CLOCK_SECOND/60 + random(5) * CLOCK_SECOND/3600);
-	PROCESS_WAIT_EVENT(etimer_expired(&etimer));
+	PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
 	packetbuf_copyfrom("Hello", 6);
 	broadcast_send(&broadcast);
 
 	etimer_set(&etimer, random(5) * CLOCK_SECOND + random(5) * CLOCK_SECOND/60 + random(5) * CLOCK_SECOND/3600);
-        PROCESS_WAIT_EVENT(etimer_expired(&etimer));
+        PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
 	char message[6] = "Hello";
 	rimeaddr_t addr;
 	packetbuf_copyfrom(message, sizeof(message));
