@@ -81,7 +81,7 @@ PROCESS_THREAD(shell_hello_process, ev, data)
 
 PROCESS_THREAD(shell_leds_on_process, ev, data)
 {
-        static struct etimer etimer;
+    static struct etimer etimer;
 	
 	PROCESS_EXITHANDLER(leds_off(LEDS_ALL));
 	PROCESS_BEGIN();
