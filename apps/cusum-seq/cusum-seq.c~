@@ -382,3 +382,76 @@ void collect_data(struct shell_command *c) {
 		                         num_neighbors, beacon_interval);
 	shell_output(c, &msg, sizeof(msg), "", 0);
 }
+
+
+/*
+// |var1 - var2|
+uint16_t abs_sub(uint16_t var1, uint16_t var2) {
+
+	if(var1 > var2) {
+		return var1 - var2;
+	} else {
+		return var2 - var1;
+	}
+}
+
+// A basic squaring operation.
+uint16_t mypow2(uint16_t base) {
+
+	uint16_t result;
+
+	// Overflow checking...
+	if(base > 255) {
+		// Overflow will occur... flag w/ negative output
+		result = -1;
+	} else {
+		// No overflow will occur
+		result = base * base;
+	}
+
+	return result;
+}
+
+// Caculate (var1^2) / (2 * (var2^2))
+uint16_t log_exp_term(uint16_t var1, uint16_t var2) {
+
+	uint16_t result;
+
+	if(var2 > var1) {
+		result = 0;
+	} else {
+		result  = mypow2(var1/var2);
+		result = result / 2;
+	}
+
+	return result;
+}
+
+// Calculate log(var) (base e), a very crude approximation.
+int mylog(uint16_t var) {
+	int Nis;
+	for(Nis = 0;Nis < 16;Nis++) {
+		if((var>>Nis) <= 1) {
+			break;
+		}
+	}
+	return (69*Nis)/100;
+}
+
+// Calculate the square root of var.
+uint16_t mysqrt(uint16_t var) {
+
+	int Nis;
+	if(var < 1) {
+		return 1;
+	} else {
+		for(Nis = 2; Nis < 255; Nis++) {
+			if(mypow2(Nis) > var) {
+				return Nis - 1;
+			}
+		}
+	}
+	
+	// There has been some kind of error.  Return -1.
+	return -1;
+}*/

@@ -1,0 +1,11 @@
+#ifndef __SKY_MATH_H__
+#define __SKY_MATH_H__
+
+// Function declarations
+uint16_t abs_sub(uint16_t var1, uint16_t var2);
+uint16_t mypow2(uint16_t base);
+uint16_t log_exp_term(uint16_t var1, uint16_t var2);
+int mylog(uint16_t var);
+uint16_t mysqrt(uint16_t var);
+
+#endif /* __SKY_MATH_H__ */
