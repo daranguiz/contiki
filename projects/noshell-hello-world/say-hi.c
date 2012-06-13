@@ -1,10 +1,6 @@
-#include "say-hi.h"
 #include "contiki.h"
 #include "net/rime.h"
 #include "net/rime/mesh.h"
-#include "shell.h"
-#include "shell-collect-view.h"
-#include "collect-view.h"
 #include "random.h"
 
 #include "dev/leds.h"
@@ -14,7 +10,7 @@
 #include <stdlib.h>
 
 /*---------------------------------------------------------------------------*/
-PROCESS(shell_hello_process, "hello");
+/*PROCESS(shell_hello_process, "hello");
 SHELL_COMMAND(hello_command,
               "hello",
               "hello: local node says hello",
@@ -30,7 +26,7 @@ PROCESS(shell_broadcast_hi_process, "say-hi");
 SHELL_COMMAND(say_hi_command,
               "say-hi",
               "say-hi: network nodes say hello",
-              &shell_broadcast_hi_process);
+              &shell_broadcast_hi_process);*/
 /*---------------------------------------------------------------------------*/
 static void
 broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
@@ -70,68 +66,67 @@ recv(struct mesh_conn *c, const rimeaddr_t *from, uint8_t hops)
 
 const static struct mesh_callbacks callbacks = {recv, sent, timedout}; 
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(shell_hello_process, ev, data)
-{
-	PROCESS_BEGIN();
-
-	printf("Why hello there Dario!\n");
-
-	PROCESS_END();
-}
-
-PROCESS_THREAD(shell_leds_on_process, ev, data)
-{
-    static struct etimer etimer;
-	
-	PROCESS_EXITHANDLER(leds_off(LEDS_ALL));
-	PROCESS_BEGIN();
-
-	leds_on(LEDS_ALL);
-	etimer_set(&etimer, 5 * CLOCK_SECOND);
-	PROCESS_WAIT_EVENT();
-	leds_off(LEDS_ALL);
-	
-	PROCESS_END();
-}
-
+PROCESS(shell_broadcast_hi_process, "say-hi");
+AUTOSTART_PROCESSES(&shell_broadcast_hi_process);
 PROCESS_THREAD(shell_broadcast_hi_process, ev, data)
 {
 	static struct etimer etimer;
 	
 //	PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
-	PROCESS_EXITHANDLER(mesh_close(&mesh); broadcast_close(&broadcast);)
+//	PROCESS_EXITHANDLER(mesh_close(&mesh); broadcast_close(&broadcast);)
 	PROCESS_BEGIN();
 
-        leds_on(LEDS_ALL);
-        etimer_set(&etimer, 3 * CLOCK_SECOND);
-        PROCESS_WAIT_EVENT();
-        leds_off(LEDS_ALL);
+	static int8_t counter = 0;
+	static uint8_t fail_count = 0;
+	mesh_open(&mesh, 132, &callbacks);
+	broadcast_open(&broadcast, 129, &broadcast_call);
 
-	etimer_set(&etimer, random_rand() % 5 * CLOCK_SECOND + random_rand() % 100 * CLOCK_SECOND / 100);
+	while(1) {
+	counter++;
+
+    leds_on(LEDS_ALL);
+    etimer_set(&etimer, 3 * CLOCK_SECOND);
+    PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
+    leds_off(LEDS_ALL);
+
+	etimer_set(&etimer, random_rand() % 5 * CLOCK_SECOND + 
+		random_rand() % 100 * CLOCK_SECOND / 100);
 	PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
 	packetbuf_copyfrom("Hello", 6);
 	broadcast_send(&broadcast);
 
-	etimer_set(&etimer, random_rand() % 5 * CLOCK_SECOND + random_rand() % 100 * CLOCK_SECOND / 100);
-        PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
+	etimer_set(&etimer, random_rand() % 5 * CLOCK_SECOND + 
+		random_rand() % 100 * CLOCK_SECOND / 100);
+    PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
 	char message[6] = "Hello";
 	rimeaddr_t addr;
 	packetbuf_copyfrom(message, sizeof(message));
 	addr.u8[0] = 62;
 	addr.u8[1] = 41;
-	mesh_send(&mesh, &addr);
-	printf("%s\n", message);
-	
+	uint8_t mesh_sent = 0;
+	mesh_sent = mesh_send(&mesh, &addr);
+	if (mesh_sent == 0) {
+		fail_count++;
+		if (counter == 10 && fail_count >= 4)
+		{
+			mesh_open(&mesh, 132, &callbacks);
+			counter = 0;
+			fail_count = 0;
+		} else if (counter == 10)
+			counter = 0;
+	}
+	}
+
 	PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
-void shell_command_list_init(void)
+/*void shell_command_list_init(void)
 {
 	broadcast_open(&broadcast, 129, &broadcast_call);
 	mesh_open(&mesh, 132, &callbacks);
 	shell_register_command(&hello_command);
-        shell_register_command(&leds_on_command);
+    shell_register_command(&leds_on_command);
 	shell_register_command(&say_hi_command);
-}
+}*/
 /*---------------------------------------------------------------------------*/
 
