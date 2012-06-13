@@ -176,6 +176,89 @@ void shell_mean_shift_init(void)
 	shell_register_command(&mesh_reset_command);
 }
 
+char shell_datatochar(const char *str) {
+	const char *strptr = str;
+
+	if(str == NULL) {
+		return 0;
+	}
+
+	while(*strptr == ' ') {
+		++strptr;
+	}
+
+	return *strptr;
+}
+
+// Switches on the currently selected sensor.
+void sensor_init(void) {
+	switch(sensor_sel) {
+		case 'v': 
+			SENSORS_ACTIVATE(battery_sensor);
+			break;
+		case 'i':
+			SENSORS_ACTIVATE(sht11_sensor);
+			break;
+		case 't':
+			SENSORS_ACTIVATE(sht11_sensor);
+			break;
+		case 'h':
+			SENSORS_ACTIVATE(sht11_sensor);
+			break;
+		case 'l':
+			SENSORS_ACTIVATE(light_sensor);
+			break;
+		case 's':
+			SENSORS_ACTIVATE(light_sensor);
+			break;
+	}
+}
+
+// Switches off the currently selected sensor.
+void sensor_uinit(void) {
+	switch(sensor_sel) {
+		case 'v': 
+			SENSORS_DEACTIVATE(battery_sensor);
+			break;
+		case 'i':
+			SENSORS_DEACTIVATE(sht11_sensor);
+			break;
+		case 't':
+			SENSORS_DEACTIVATE(sht11_sensor);
+			break;
+		case 'h':
+			SENSORS_DEACTIVATE(sht11_sensor);
+			break;
+		case 'l':
+			SENSORS_DEACTIVATE(light_sensor);
+			break;
+		case 's':
+			SENSORS_DEACTIVATE(light_sensor);
+			break;
+	}
+}
+
+// Reads the currently selected sensor.
+uint16_t sensor_read(void) {
+	switch(sensor_sel) {
+		case 'v': 
+			return battery_sensor.value(0);
+		case 'i':
+			return sht11_sensor.value(SHT11_SENSOR_BATTERY_INDICATOR);
+		case 't':
+			return sht11_sensor.value(SHT11_SENSOR_TEMP);
+		case 'h':
+			return sht11_sensor.value(SHT11_SENSOR_HUMIDITY);
+		case 'l':
+			return light_sensor.value(LIGHT_SENSOR_PHOTOSYNTHETIC);
+		case 's':
+			return light_sensor.value(LIGHT_SENSOR_TOTAL_SOLAR);
+	}
+
+	// Else error, return 0
+	return 0;
+}
+
 // Does a squre root operation on num.
 uint16_t mysqrt(uint16_t num)
 {
