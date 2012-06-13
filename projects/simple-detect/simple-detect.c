@@ -30,7 +30,7 @@ PROCESS_THREAD(simple_detect_process, ev, data)
 	shell_collect_view_init();
 	
 	// Here's where it differs from the normal collect-view program
-	shell_command_list_init();
+	shell_mean_shift_init();
 
 	PROCESS_END();
 }

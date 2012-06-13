@@ -1,7 +1,7 @@
 #Configuration for Collect
-#Mon Jun 11 16:16:50 CDT 2012
-collect.nodeinfo.table=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
-101.198=260,464
-227.168=497,415
+#Mon Jun 11 16:25:13 CDT 2012
 collect.bounds=0,0,640,594
+227.168=497,415
 collect.serialport=/dev/ttyUSB0
+101.198=260,464
+collect.nodeinfo.table=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
