@@ -1,6 +1,6 @@
-#ifndef __GAUSSIAN_CUSUM_H__
-#define __GAUSSIAN_CUSUM_H__
+#ifndef __TEMPERATURE_H__
+#define __TEMPERATURE_H__
 
 #include "contiki.h"
 
-#endif /* __GAUSSIAN_CUSUM_H__ */
+#endif /* __TEMPERATURE_H__ */

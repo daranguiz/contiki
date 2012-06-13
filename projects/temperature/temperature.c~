@@ -31,8 +31,7 @@ PROCESS_THREAD(temperature_process, ev, data) {
 	shell_collect_view_init();
 
 	// Here's where it differs from the normal collect-view program.	
-	shell_global_sensor_init();
-	shell_sample_stats_init();
+	shell_sequence_init();
 
 	PROCESS_END();
 }
