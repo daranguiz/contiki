@@ -1,7 +1,0 @@
-CONTIKI_PROJECT = global-sensor
-all: $(CONTIKI_PROJECT) 
-
-APPS = serial-shell powertrace collect-view cusum-seq global-sensor
-CONTIKI=/home/user/contiki
-
-include $(CONTIKI)/Makefile.include
