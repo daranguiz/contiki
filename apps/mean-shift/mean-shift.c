@@ -16,6 +16,8 @@
 
 #include "dev/leds.h"
 #include "dev/light-sensor.h"
+#include "dev/sht11-sensor.h"
+#include "dev/battery-sensor.h"
 #include "dev/serial-line.h"
 #include <stdio.h>
 #include <string.h>
@@ -52,6 +54,17 @@ uint16_t counter;
 static uint16_t mean_0 = 0;
 static int16_t mean_1;
 static uint16_t stdev_0 = 1;
+
+/*
+v - battery voltage
+i - SHT11 battery indicator
+l - light1 (photosynthetic) sensor
+s - tight2 (total solar) sensor
+t - SHT11 temperature sensor
+h - SHT11 humidity sensor
+*/
+static char sensor_sel = 'l';
+
 /*---------------------------------------------------------------------------*/
 PROCESS(shell_simpledetect_process, "simple-detect");
 SHELL_COMMAND(simpledetect_command,
@@ -70,6 +83,11 @@ SHELL_COMMAND(mesh_reset_command,
               "mesh-reset",
               "mesh-reset: reopens the mesh connection",
               &shell_mesh_reset_process);
+PROCESS(shell_sensor_select_process, "sensor-sel");
+SHELL_COMMAND(sensor_select_command,
+              "sensor-sel",
+              "sensor-sel [char]: set active sensor to [char]",
+              &shell_sensor_select_process);
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(shell_simpledetect_process, ev, data)
 {
@@ -82,7 +100,8 @@ PROCESS_THREAD(shell_simpledetect_process, ev, data)
 
 	PROCESS_BEGIN();
 
-	SENSORS_ACTIVATE(light_sensor);
+	sensor_init();
+	//SENSORS_ACTIVATE(light_sensor);
 	etimer_set(&etimer, CLOCK_SECOND);
 	PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
 	while (1)
@@ -94,7 +113,8 @@ PROCESS_THREAD(shell_simpledetect_process, ev, data)
 		{
 			etimer_set(&etimer, CLOCK_SECOND / NUM_SAM);
 			PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
-			data_sam[counter] = light_sensor.value(LIGHT_SENSOR_PHOTOSYNTHETIC);
+			data_sam[counter] = sensor_read();
+			//data_sam[counter] = light_sensor.value(LIGHT_SENSOR_PHOTOSYNTHETIC);
 			mean_1 = mean_1 + data_sam[counter];
 		}
 
@@ -119,10 +139,11 @@ PROCESS_THREAD(shell_simpledetect_process, ev, data)
 		packetbuf_copyfrom(message, sizeof(message));
 		mesh_send(&mesh, &addr);
 		
-		if (mean_1 > 300)
+		if (mean_1 > stdev_0*3)
 		{
 			leds_on(LEDS_RED);
 			packetbuf_copyfrom("Change detected", strlen("Change detected"));
+			sensor_uinit();
 			mesh_send(&mesh, &addr);
 			break;
 		}
@@ -135,23 +156,25 @@ PROCESS_THREAD(shell_sample_init_process, ev, data)
 {
 	static uint16_t data_sam[NUM_SAM];
 	static struct etimer etimer;
-	char values[5];
 
 	PROCESS_BEGIN();
 	
 	
 	// Gather NUM_SUM samples over one second of time
-	SENSORS_ACTIVATE(light_sensor);
+	sensor_init();
+	//SENSORS_ACTIVATE(light_sensor);
 	mean_0 = 0;
 	for (counter = 0; counter < NUM_SAM; counter++)
 	{
 		etimer_set(&etimer, CLOCK_SECOND / NUM_SAM); 
 		PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
-		data_sam[counter] = light_sensor.value(LIGHT_SENSOR_PHOTOSYNTHETIC);
+		data_sam[counter] = sensor_read();
+		//data_sam[counter] = light_sensor.value(LIGHT_SENSOR_PHOTOSYNTHETIC);
 		mean_0 = mean_0 + data_sam[counter];
-		printf("Light reading = %d  Sum = %d\n", data_sam[counter], mean_0);
+		printf("Reading = %d  Sum = %d\n", data_sam[counter], mean_0);
 	}
-	SENSORS_DEACTIVATE(light_sensor);
+	sensor_uinit();
+	//SENSORS_DEACTIVATE(light_sensor);
 
 	mean_0 = mean_0/NUM_SAM;
 	stdev_0 = mystdev(data_sam, mean_0);
@@ -165,15 +188,129 @@ PROCESS_THREAD(shell_mesh_reset_process, ev, data)
 	mesh_open(&mesh, 132, &callbacks);
 	PROCESS_END();
 }
+
+PROCESS_THREAD(shell_sensor_select_process, ev, data)
+{
+
+	static char temp_var = 'x';
+
+	PROCESS_BEGIN();
+
+	temp_var = shell_datatochar(data);
+
+	if(temp_var == 'v') {
+		sensor_sel = 'v';
+	} else if(temp_var == 'i') {
+		sensor_sel = 'i';
+	} else if(temp_var == 'l') {
+		sensor_sel = 'l';
+	} else if(temp_var == 's') {
+		sensor_sel = 's';
+	} else if(temp_var == 't') {
+		sensor_sel = 't';
+	} else if(temp_var == 'h') {
+		sensor_sel = 'h';
+	} else {
+		printf("Must choose one of {v,i,l,s,t,h}\n");
+		printf("Currently %c\n", sensor_sel);
+	}
+
+	PROCESS_END();
+}
 /*---------------------------------------------------------------------------*/
-void shell_command_list_init(void)
+void shell_mean_shift_init(void)
 {
 	mesh_open(&mesh, 132, &callbacks);
 	shell_register_command(&simpledetect_command);
 	shell_register_command(&sample_init_command);
 	shell_register_command(&mesh_reset_command);
+	shell_register_command(&sensor_select_command);
 }
 
+char shell_datatochar(const char *str) {
+	const char *strptr = str;
+
+	if(str == NULL) {
+		return 0;
+	}
+
+	while(*strptr == ' ') {
+		++strptr;
+	}
+
+	return *strptr;
+}
+
+// Switches on the currently selected sensor.
+void sensor_init(void) {
+	switch(sensor_sel) {
+		case 'v': 
+			SENSORS_ACTIVATE(battery_sensor);
+			break;
+		case 'i':
+			SENSORS_ACTIVATE(sht11_sensor);
+			break;
+		case 't':
+			SENSORS_ACTIVATE(sht11_sensor);
+			break;
+		case 'h':
+			SENSORS_ACTIVATE(sht11_sensor);
+			break;
+		case 'l':
+			SENSORS_ACTIVATE(light_sensor);
+			break;
+		case 's':
+			SENSORS_ACTIVATE(light_sensor);
+			break;
+	}
+}
+
+// Switches off the currently selected sensor.
+void sensor_uinit(void) {
+	switch(sensor_sel) {
+		case 'v': 
+			SENSORS_DEACTIVATE(battery_sensor);
+			break;
+		case 'i':
+			SENSORS_DEACTIVATE(sht11_sensor);
+			break;
+		case 't':
+			SENSORS_DEACTIVATE(sht11_sensor);
+			break;
+		case 'h':
+			SENSORS_DEACTIVATE(sht11_sensor);
+			break;
+		case 'l':
+			SENSORS_DEACTIVATE(light_sensor);
+			break;
+		case 's':
+			SENSORS_DEACTIVATE(light_sensor);
+			break;
+	}
+}
+
+// Reads the currently selected sensor.
+uint16_t sensor_read(void) {
+	switch(sensor_sel) {
+		case 'v': 
+			return battery_sensor.value(0);
+		case 'i':
+			return sht11_sensor.value(SHT11_SENSOR_BATTERY_INDICATOR);
+		case 't':
+			return sht11_sensor.value(SHT11_SENSOR_TEMP);
+		case 'h':
+			return sht11_sensor.value(SHT11_SENSOR_HUMIDITY);
+		case 'l':
+			return light_sensor.value(LIGHT_SENSOR_PHOTOSYNTHETIC);
+		case 's':
+			return light_sensor.value(LIGHT_SENSOR_TOTAL_SOLAR);
+	}
+
+	// Else error, return 0
+	return 0;
+}
+
+// Does a squre root operation on num.
 uint16_t mysqrt(uint16_t num)
 {
 	uint16_t y = 1;
@@ -200,14 +337,14 @@ uint16_t mystdev(uint16_t *sample_array, uint16_t mean)
         return mysqrt(sum);
 }
 
-// 1/16th second LED blink
+// 1/8th second LED blink
 // So what's going on here? With leds_off, ledv, current_leds? 
 void blink_LEDs(unsigned char ledv) 
 {
 	unsigned char current_leds;
 	current_leds = leds_get();
 	leds_on(ledv);
-	clock_delay(125);
+	clock_delay(250);
 	if (current_leds == LEDS_RED)
 		leds_off(ledv & (~LEDS_RED));
 	else leds_off(ledv);
