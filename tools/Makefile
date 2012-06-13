@@ -1,5 +1,8 @@
 all: codeprop tunslip
 
+CONTIKI=/home/user/contiki
+include $(CONTIKI)/Makefile.include
+
 gitclean:
 	@git clean -d -x -n ..
 	@echo "Enter yes to delete these files";

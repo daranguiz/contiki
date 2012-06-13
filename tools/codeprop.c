@@ -48,6 +48,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include <net/uip.h>
 /* Should be included from codeprop.h, but the include paths in the makefiles
    isn't set up for that. */
 #define HDR_SIZE 4
