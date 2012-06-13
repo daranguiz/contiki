@@ -9,6 +9,7 @@
 #include "dev/serial-line.h"
 #include "lib/sky-math.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // Number of samples to be taken over 1 second time period
@@ -46,16 +47,15 @@ recv(struct mesh_conn *c, const rimeaddr_t *from, uint8_t hops)
 const static struct mesh_callbacks callbacks = {recv, sent, timedout};
 /*---------------------------------------------------------------------------*/
 uint16_t counter;
-static uint16_t mean_0;
-static uint16_t mean_1;
-static uint16_t std_dev_0 = 1;
-static uint16_t std_dev_1 = 1;
+uint16_t sample_mean = 0;
+uint16_t sample_std_dev = 1;
 /*---------------------------------------------------------------------------*/
 PROCESS(shell_sample_stats_process, "sample-stats");
 SHELL_COMMAND(sample_stats_command,
 		"sample-stats",
-		"sample-stats: gathers data and finds mean and standard deviation",
+		"sample-stats: gathers data and finds sample_mean and standard deviation",
 		&shell_sample_stats_process);
+
 PROCESS(shell_get_stats_process, "get-stats");
 SHELL_COMMAND(get_stats_command,
 		"get-stats",
@@ -73,7 +73,7 @@ PROCESS_THREAD(shell_sample_stats_process, ev, data) {
 
 	// Gather NUM_SAM samples over 1 second of time
 	sensor_init();
-	printf("Gathering pre-change data... ");
+	printf("Gathering data... ");
 	for(counter = 0;counter < NUM_SAM;counter++) {
 		// Get data for no change analysis.
 		etimer_set(&etimer, CLOCK_SECOND / NUM_SAM);
@@ -88,20 +88,20 @@ PROCESS_THREAD(shell_sample_stats_process, ev, data) {
 	for(counter = 0;counter < NUM_SAM;counter++) {
 		sum = sum + data_sam[counter];
 	}
-	mean_0 = 0;
+	sample_mean = 0;
 	printf("sum = %d\n",sum);
-	mean_0 = sum/NUM_SAM;		// 155.3130
-	printf("mean_0 = %d\n",mean_0);
+	sample_mean = sum/NUM_SAM;
+	printf("sample_mean = %d\n",sample_mean);
 
-	// Caclulate std_dev_0
+	// Caclulate sample_std_dev
 	sqsum = 0;
 	for(counter = 0;counter < NUM_SAM;counter++) {
-		sqsum = sqsum + mypow2(abs_sub(data_sam[counter], mean_0));
+		sqsum = sqsum + mypow2(abs_sub(data_sam[counter], sample_mean));
 	}
-	std_dev_0 = 0;
-	std_dev_0 = sqsum/NUM_SAM;	// 0.9947
-	std_dev_0 = mysqrt(std_dev_0);
-	printf("std_dev_0 = %d\n",std_dev_0);
+	sample_std_dev = 0;
+	sample_std_dev = sqsum/NUM_SAM;
+	sample_std_dev = mysqrt(sample_std_dev);
+	printf("std_dev = %d\n",sample_std_dev);
 
 	PROCESS_END();
 }
@@ -113,29 +113,28 @@ PROCESS_THREAD(shell_get_stats_process, ev, data) {
 	// Print out the data distribution stats, to both the local serial and
 	// broadcast over the network as a response to a call.
 
-	char message[32];
-	strcpy(message,"mean_0 = ");			// 9 chars
+	char message[29];
+	strcpy(message,"sample_mean = ");				// 7 chars
 	char num[5];
-	itoa(mean_0, num, 10);
+	itoa(sample_mean, num, 10);
 	strcat(message,num);					// 5 chars
 
-	strcat(message,"\nstd_dev_0 = \n");		// 14 chars
-	itoa(std_dev_0, num, 10);
+	strcat(message,"\nstd_dev = ");			// 11 chars
+	itoa(sample_std_dev, num, 10);
 	strcat(message,num);					// 5 chars
+	strcat(message,"\n");					// 1 char
 
-											// Total = 33 chars
+											// Total = 29 chars
 
 	packetbuf_copyfrom(message, sizeof(message));
 
 	rimeaddr_t addr;
-
 	/*
 	Addresses of the nodes:
 	1: 97.43
 	2: 88.56
 	4: 62.41
 	*/
-
 	addr.u8[0] = 62;
 	addr.u8[1] = 41;
     mesh_send(&mesh, &addr);

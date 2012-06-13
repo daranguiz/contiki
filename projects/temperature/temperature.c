@@ -10,6 +10,7 @@
 #include "collect-view.h"
 #include "global-sensor.h"
 #include "tool-sample-stats.h"
+#include "test-change-detect.h"
 
 /*---------------------------------------------------------------------------*/
 PROCESS(temperature_process, "Temperature Localization Process");
@@ -33,6 +34,7 @@ PROCESS_THREAD(temperature_process, ev, data) {
 	// Here's where it differs from the normal collect-view program.	
 	shell_global_sensor_init();
 	shell_sample_stats_init();
+	shell_test_change_detect_init();
 
 	PROCESS_END();
 }
