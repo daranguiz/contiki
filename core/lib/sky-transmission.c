@@ -6,7 +6,7 @@
 #define MESH 1
 #define BROADCAST 2
 #define UNICAST 3
-#define TRANSMISSION_PROTOCOL MESH
+#define TRANSMISSION_PROTOCOL BROADCAST
 
 /*---------------------------------------------------------------------------*/
 #if TRANSMISSION_PROTOCOL == MESH
@@ -42,7 +42,7 @@ const static struct mesh_callbacks callbacks = {recv, sent, timedout};
 int transmit_mesh(char *message, uint8_t addr_one, uint8_t addr_two)
 {
 	rimeaddr_t addr;
-	packetbuf_copyfrom(message, sizeof(message));
+	packetbuf_copyfrom(message, strlen(message));
 	addr.u8[0] = addr_one;
 	addr.u8[1] = addr_two;
 	return mesh_send(&mesh, &addr);
@@ -76,8 +76,8 @@ static struct broadcast_conn broadcast;
 
 int transmit_broadcast(char *message)
 {
-	packetbuf_copyfrom(message, sizeof(message));
-	broadcast_send(&broadcast);
+	packetbuf_copyfrom(message, strlen(message));
+	return broadcast_send(&broadcast);
 }
 
 void open_broadcast()
@@ -113,7 +113,8 @@ int transmit_unicast(char *message, uint8_t addr_one, uint8_t addr_two)
 	addr.u8[0] = addr_one;
 	addr.u8[1] = addr_two;
 	if (!rimeaddr_cmp(&addr, &rimeaddr_node_addr)) 
-		unicast_send(&uc, &addr);
+		return unicast_send(&uc, &addr);
+	else return 0;
 }
 
 void open_unicast()

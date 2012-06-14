@@ -2,7 +2,6 @@
 #define __SKY_TRANSMISSION_H__
 
 #include "net/rime.h"
-#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 

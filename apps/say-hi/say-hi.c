@@ -27,15 +27,15 @@ PROCESS_THREAD(shell_say_hi_process, ev, data)
 	PROCESS_WAIT_EVENT();
 	leds_off(LEDS_ALL);
 
-	char message[7] = "Sup bro";
-	transmit_mesh(message, 2, 0);
+	char message[6]= "Hello";
+	transmit_broadcast(message);
 
 	PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
 void shell_command_list_init(void)
 {
-	open_mesh();
+	open_broadcast();
 	shell_register_command(&say_hi_command);
 }
 /*---------------------------------------------------------------------------*/
