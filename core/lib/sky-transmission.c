@@ -3,10 +3,13 @@
  */
 
 #include "sky-transmission.h"
-#define TRANSMISSION_PROTOCOL "mesh"
+#define MESH 1
+#define BROADCAST 2
+#define UNICAST 3
+#define TRANSMISSION_PROTOCOL MESH
 
 /*---------------------------------------------------------------------------*/
-#if TRANSMISSION_PROTOCOL == "mesh"
+#if TRANSMISSION_PROTOCOL == MESH
 #include "net/rime/mesh.h"
 
 static struct mesh_conn mesh;
@@ -42,7 +45,7 @@ int transmit_mesh(char *message, uint8_t addr_one, uint8_t addr_two)
 	packetbuf_copyfrom(message, sizeof(message));
 	addr.u8[0] = addr_one;
 	addr.u8[1] = addr_two;
-	return mesh_send(&mesh, &addr):
+	return mesh_send(&mesh, &addr);
 }
 
 void open_mesh()
@@ -57,8 +60,8 @@ void close_mesh()
 
 
 /*---------------------------------------------------------------------------*/
-#elif TRANSMISSION_PROTOCOL == "broadcast"
-#include "net/rime/broadcast.h"
+#elif TRANSMISSION_PROTOCOL == BROADCAST
+//#include "net/rime/broadcast.h"
 
 static void
 broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
@@ -68,7 +71,7 @@ broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
 			(char *)packetbuf_dataptr(), packetbuf_datalen());
 }
 
-static const broadcast_callbacks broadcast_call = {broadcast_recv};
+static const struct broadcast_callbacks broadcast_call = {broadcast_recv};
 static struct broadcast_conn broadcast;
 
 int transmit_broadcast(char *message)
@@ -84,13 +87,13 @@ void open_broadcast()
 
 void close_broadcast()
 {
-	broadcast_close(&broadcast)
+	broadcast_close(&broadcast);
 }
 
 
 /*---------------------------------------------------------------------------*/
-#elif TRANSMISSION_PROTOCOL == "unicast"
-#include "net/rime/unicast.h"
+#elif TRANSMISSION_PROTOCOL == UNICAST
+//#include "net/rime/unicast.h"
 
 static void
 recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
@@ -106,7 +109,7 @@ static struct unicast_conn uc;
 int transmit_unicast(char *message, uint8_t addr_one, uint8_t addr_two)
 {
 	rimeaddr_t addr;
-	packetbuf_copyfrom(message, sizeof(message));
+	packetbuf_copyfrom(message, strlen(message));
 	addr.u8[0] = addr_one;
 	addr.u8[1] = addr_two;
 	if (!rimeaddr_cmp(&addr, &rimeaddr_node_addr)) 

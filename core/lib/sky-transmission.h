@@ -2,8 +2,9 @@
 #define __SKY_TRANSMISSION_H__
 
 #include "net/rime.h"
-//#include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 int transmit_mesh(char *message, uint8_t addr_one, uint8_t addr_two);
 void open_mesh();
