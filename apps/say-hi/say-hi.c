@@ -28,14 +28,14 @@ PROCESS_THREAD(shell_say_hi_process, ev, data)
 	leds_off(LEDS_ALL);
 
 	char message[6]= "Hello";
-	transmit_broadcast(message);
+	transmit_mesh(message,1,0);
 
 	PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
 void shell_command_list_init(void)
 {
-	open_broadcast();
+	open_mesh();
 	shell_register_command(&say_hi_command);
 }
 /*---------------------------------------------------------------------------*/

@@ -1,7 +1,7 @@
 CONTIKI_PROJECT = hello-world
 all: $(CONTIKI_PROJECT) 
 
-APPS = serial-shell powertrace collect-view say-hi
+APPS = serial-shell say-hi codeprop
 CONTIKI=/home/user/contiki
 
 include $(CONTIKI)/Makefile.include

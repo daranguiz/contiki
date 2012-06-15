@@ -23,7 +23,8 @@ PROCESS_THREAD(hello_world_process, ev, data)
 	shell_time_init();
 	shell_sky_init();
 	shell_collect_view_init();
-	
+
+//	shell_codeprop_init();	
 	// Here's where it differs from the normal collect-view program
 	shell_command_list_init();
 

@@ -66,7 +66,7 @@ unsigned short mysqrt(unsigned short var) {
 		return -1;
 	else {
 		for (counter = 0; counter < 15; counter++) {
-			y = (num/y + y) / 2;
+			y = (var/y + y) / 2;
 		}
 		return y;
 	}
