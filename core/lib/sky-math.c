@@ -58,17 +58,16 @@ int mylog(unsigned short var) {
 // Calculate the square root of var.
 unsigned short mysqrt(unsigned short var) {
 
-	int Nis;
-	if(var < 1) {
+	unsigned short y = 1;
+	unsigned short counter = 0;
+	if (var < 1)
 		return 1;
-	} else {
-		for(Nis = 2; Nis < 255; Nis++) {
-			if(mypow2(Nis) > var) {
-				return Nis - 1;
-			}
+	else if (var > 65535)
+		return -1;
+	else {
+		for (counter = 0; counter < 15; counter++) {
+			y = (num/y + y) / 2;
 		}
+		return y;
 	}
-	
-	// There has been some kind of error.  Return -1.
-	return -1;
 }

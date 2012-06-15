@@ -6,7 +6,7 @@
 #define MESH 1
 #define BROADCAST 2
 #define UNICAST 3
-#define TRANSMISSION_PROTOCOL BROADCAST
+#define TRANSMISSION_PROTOCOL MESH
 
 /*---------------------------------------------------------------------------*/
 #if TRANSMISSION_PROTOCOL == MESH
