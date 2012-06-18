@@ -87,6 +87,7 @@ PROCESS_THREAD(shell_adaptive_cusum_process, ev, data)
 		if (D_k < DK_BOUND * -1 || DK_BOUND < D_k)
 			leds_on(LEDS_BLUE);
 		else leds_off(LEDS_BLUE);
+		printf("S_n: %d\nD_k: %d\n", S_n, D_k);
 	}
 
 	PROCESS_END();
