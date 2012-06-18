@@ -13,12 +13,12 @@ unsigned short abs_sub(unsigned short var1, unsigned short var2) {
 }
 
 // A basic squaring operation.
-unsigned short mypow2(unsigned short base) {
+unsigned short mypow2(signed short base) {
 
 	unsigned short result;
 
 	// Overflow checking...
-	if(base > 255) {
+	if(base > 255 || base < -255) {
 		// Overflow will occur... flag w/ negative output
 		result = -1;
 	} else {
