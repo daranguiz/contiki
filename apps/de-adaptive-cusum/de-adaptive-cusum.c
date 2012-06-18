@@ -10,6 +10,7 @@
 
 #define NUM_SAMPLES 50
 #define ZK_BOUND 10
+#define DK_BOUND 8
 /*---------------------------------------------------------------------------*/
 PROCESS(shell_adaptive_cusum_process, "ad-cusum");
 SHELL_COMMAND(adaptive_cusum_command,
@@ -39,6 +40,7 @@ PROCESS_THREAD(shell_adaptive_cusum_process, ev, data)
 	static uint16_t phi_hat = 0;
 
 	// Standard CUSUM variables
+	// Note: threshold "b" is arbitrarily chosen
 	static int16_t S_n = 0;
 	static int16_t minS_n = 0;
 	uint16_t b = 20;
@@ -60,42 +62,31 @@ PROCESS_THREAD(shell_adaptive_cusum_process, ev, data)
 		phi_hat_a = phi_hat_a + epsilon * D_k;
 		phi_hat_b = phi_hat_a + delta;
 
-		// Calculate parameter estimate and check bounds
+		// Calculate parameter estimate (phi_hat) and check bounds
 		phi_hat = phi_hat_a + 0.5 * delta;
 		if (phi_hat > phi_max) 
 			phi_hat = phi_max;
 		else if (phi_hat < phi_min)
 			phi_hat = phi_min;
 		
-		// now do CUSUM normally, using phi_hat
-		// find new log-likelihood statistic
+		// Run CUSUM test normally, using phi_hat
+		// And find new log-likelihood statistic
 		int16_t z_k = (mypow2(obs - sample_mean))/2 - (mypow2(obs - phi_hat))/2;
 		if (ZK_BOUND * -1 < z_k && z_k < ZK_BOUND)
 			z_k = 0;
-		//printf("z_k: %d\n", z_k);
-		//printf("(obs - sample_mean): %d\n(obs - phi_hat): %d\n1st squared over 2: %d\n2nd squared over 2: %d\nz_k: %d\n", obs - sample_mean, obs - phi_hat, (mypow2(obs - sample_mean))/2, mypow2(obs - phi_hat)/2, z_k);
 
-
-		// Add the log-likelihood statistic to the current sum
+		// Add the log-likelihood statistic to the current CUSUM
 		S_n = S_n + z_k;
-		printf("S_n: %d\n", S_n);
-		printf("phi_hat: %d\n", phi_hat);
-	/*	if (S_n < minS_n)
-			printf("minS_n: %d\n", S_n);
-		else printf("minS_n: %d\n", minS_n);
-	*/	
+	
 		// Check to see if a change was detected or not
-		if (S_n >= (minS_n + b)) // && (stop_updating_decision_time == 0))
+		if (S_n >= (minS_n + b))
 		{
-			decision = 1;
-			printf("Change detected\n");
 			leds_on(LEDS_RED);
 		} else if (S_n < minS_n)
 			minS_n = S_n;
-		if (-8 > D_k || D_k > 8)
+		if (D_k < DK_BOUND * -1 || DK_BOUND < D_k)
 			leds_on(LEDS_BLUE);
 		else leds_off(LEDS_BLUE);
-		printf("\n");
 	}
 
 	PROCESS_END();
@@ -103,6 +94,5 @@ PROCESS_THREAD(shell_adaptive_cusum_process, ev, data)
 /*---------------------------------------------------------------------------*/
 void shell_adaptive_cusum_init(void)
 {
-	open_mesh();
 	shell_register_command(&adaptive_cusum_command);
 }
