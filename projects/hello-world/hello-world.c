@@ -26,7 +26,7 @@ PROCESS_THREAD(hello_world_process, ev, data)
 
 //	shell_codeprop_init();	
 	// Here's where it differs from the normal collect-view program
-	shell_command_list_init();
+	shell_hello_world_init();
 
 	PROCESS_END();
 }
