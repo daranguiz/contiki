@@ -2,7 +2,7 @@
 #define __SAY_HI_H__
 
 #include "shell.h"
-void shell_command_list_init(void);
+void shell_hello_world_init(void);
 
 
 #endif

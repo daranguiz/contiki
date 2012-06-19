@@ -6,8 +6,9 @@
 #define MESH 1
 #define BROADCAST 2
 #define UNICAST 3
-#define TRANSMISSION_PROTOCOL MESH
+#define TRANSMISSION_PROTOCOL UNICAST
 
+uint8_t from_node = 0;
 /*---------------------------------------------------------------------------*/
 #if TRANSMISSION_PROTOCOL == MESH
 #include "net/rime/mesh.h"
@@ -34,7 +35,9 @@ recv(struct mesh_conn *c, const rimeaddr_t *from, uint8_t hops)
 			(char *)packetbuf_dataptr(), packetbuf_datalen());
 	
 //	packetbuf_copyfrom("Hop", strlen("Hop"));
-//	mesh_send(&mesh, from):
+//	mesh_send(&mesh, from);
+	from_node = from->u8[0];
+	process_post(&shell_round_robin_process, received_data, NULL);
 }
 
 const static struct mesh_callbacks callbacks = {recv, sent, timedout};
@@ -69,6 +72,7 @@ broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
 	printf("Broadcast data received from %d.%d: %s (%d)\n",
 			from->u8[0], from->u8[1],
 			(char *)packetbuf_dataptr(), packetbuf_datalen());
+	from_node = from->u8[0];
 }
 
 static const struct broadcast_callbacks broadcast_call = {broadcast_recv};
@@ -101,6 +105,7 @@ recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 	printf("Unicast data received from %d.%d: %s (%d)\n",
 			from->u8[0], from->u8[1],
 			(char *)packetbuf_dataptr(), packetbuf_datalen());
+	from_node = from->u8[0];
 }
 
 static const struct unicast_callbacks unicast_callbacks = {recv_uc};

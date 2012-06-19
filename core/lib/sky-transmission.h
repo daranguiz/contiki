@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
+extern uint8_t from_node;
+
 int transmit_mesh(char *message, uint8_t addr_one, uint8_t addr_two);
 void open_mesh();
 void close_mesh();
