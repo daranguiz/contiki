@@ -15,7 +15,8 @@
 #include <string.h>
 
 #define FIRST_NODE 9
-#define LAST_NODE 10
+#define LAST_NODE 28
+#define FREQUENCY 50
 #define MAX_RETRANSMISSIONS 4
 #define NUM_HISTORY_ENTRIES 4
 
@@ -94,20 +95,16 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 
 	if (rimeaddr_node_addr.u8[0] == FIRST_NODE)
 	{ 
-		uint8_t successful = 0;
 		static struct etimer etimer0;
 		uint8_t next_node = FIRST_NODE + 1;
 		
-		etimer_set(&etimer0, CLOCK_SECOND);
+		etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
 		leds_on(LEDS_ALL);
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
-		successful = transmit_unicast("Hello", next_node);
+		transmit_unicast("Hello", next_node);
 		leds_off(LEDS_ALL);
-		if (!successful)
-			leds_on(LEDS_ALL);
 	}
 	
-
 	PROCESS_END();
 }
 
@@ -117,27 +114,27 @@ PROCESS_THREAD(shell_round_robin_blink_process, ev, data)
 	PROCESS_BEGIN();
 
 	static struct etimer etimer;
-	uint8_t my_node = rimeaddr_node_addr.u8[0];
-	uint8_t next_node = my_node + 1;
-	uint8_t successful = 0;
+	static uint8_t my_node;
+	my_node = rimeaddr_node_addr.u8[0];
+	static uint8_t next_node;
+	next_node = my_node + 1;
+	
 	if (my_node == LAST_NODE)
 		next_node = FIRST_NODE;
 
-	etimer_set(&etimer, CLOCK_SECOND);
+	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
 	leds_on(LEDS_ALL);
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
-	successful = transmit_unicast("Hello", next_node);
+	transmit_unicast("Hello", next_node);
 	leds_off(LEDS_ALL);
-	if (!successful)
-		leds_on(LEDS_ALL);
-
+	
 	PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
 void shell_hello_world_init(void)
 {
 //	runicast_open(&runicast, 144, &runicast_callbacks);
-//	open_unicast();
+	open_unicast();
 	shell_register_command(&say_hi_command);
 	shell_register_command(&round_robin_start_command);
 }
