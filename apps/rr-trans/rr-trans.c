@@ -18,6 +18,7 @@
 #define LAST_NODE 15
 #define FREQUENCY 25
 #define RELIABLE 0
+#define SINK 4
 
 /*---------------------------------------------------------------------------*/
 PROCESS(shell_conn_fix_process, "conn-fix");
@@ -51,8 +52,8 @@ recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 			from->u8[0], from->u8[1], (char *)packetbuf_dataptr());
 
    	received_string = (char *)packetbuf_dataptr();	
-	transmit_unicast("Next is packetbuf", 4);
-	transmit_unicast(received_string, 4);
+//	transmit_unicast("Next is packetbuf", 4);
+//	transmit_unicast(received_string, 4);
 
 #if RELIABLE == 1
 	/* If receiving "sent" from a prior node, respond back that it was received
@@ -65,9 +66,9 @@ recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 		process_start(&round_robin_blink_process, NULL);
 	} else process_exit(&round_robin_blink_process);
 #else 
-	if (from->u8[0] == LAST_NODE)
-		return;
-	else
+//	if (from->u8[0] == LAST_NODE)
+//		return;
+//	else
 		process_start(&round_robin_blink_process, NULL);
 #endif
 
@@ -124,8 +125,6 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 		sensor_uinit();
 		itoa(sensor_value, message, 10);
 
-		transmit_unicast(message, 4);
-
 		etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
 		leds_on(LEDS_ALL);
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
@@ -143,32 +142,33 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 
 	static struct etimer etimer;
 	static uint8_t my_node;
-	static char *message;
+	static char message[5];
 	my_node = rimeaddr_node_addr.u8[0];
 	static uint8_t next_node;
 	next_node = my_node + 1;
 	if (my_node == LAST_NODE)
 		next_node = FIRST_NODE;
-/*
+
 	static uint16_t new_data;
 	static uint16_t received_data;
 	received_data = atoi(received_string);
-	itoa(received_data, message, 10);
-	transmit_unicast(message, 4);
+	//itoa(received_data, message, 10);
+	//transmit_unicast(message, 4);
 	sensor_init();
 	new_data = sensor_read();
 	sensor_uinit();
 	
-	received_data = received_data * (FIRST_NODE - my_node);
+	received_data = received_data * (my_node - FIRST_NODE);
 	new_data = new_data + received_data;
-	new_data = new_data / (FIRST_NODE - my_node + 1);
+	new_data = new_data / (my_node - FIRST_NODE + 1);
 	itoa(new_data, message, 10);
-*/
-	message = "HOLA";
+
 	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
 	leds_on(LEDS_ALL);
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
 	transmit_unicast(message, next_node);
+	if (my_node == LAST_NODE)
+		transmit_unicast(message, SINK);
 	leds_off(LEDS_ALL);
 
 #if RELIABLE == 1
@@ -213,6 +213,7 @@ void shell_rr_trans_init(void)
 	shell_register_command(&local_read_test_command);
 }
 
+/*
 uint16_t datatoint(const char *str) 
 {
     const char *strptr = str;
@@ -228,6 +229,6 @@ uint16_t datatoint(const char *str)
 	uint16_t value = atoi(strptr);
 	return value;
 }
-
+*/
 /*---------------------------------------------------------------------------*/
 
