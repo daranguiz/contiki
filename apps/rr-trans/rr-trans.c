@@ -1,31 +1,31 @@
-#include "say-hi.h"
+#include "rr-trans.h"
 #include "contiki.h"
 #include "shell.h"
 
 #include "dev/leds.h"
 #include "dev/serial-line.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include "node-id.h"
 
 //#include "sky-transmission.h"
 #include "net/rime.h"
 #include "net/rime/unicast.h"
-#include "net/rime/mesh.h"
-#include "net/rime/runicast.h"
 #include <string.h>
 
 #define FIRST_NODE 9
-#define LAST_NODE 17
+#define LAST_NODE 11
 #define FREQUENCY 25
+#define RELIABLE 0
 
 /*---------------------------------------------------------------------------*/
-PROCESS(shell_say_hi_process, "say-hi");
-SHELL_COMMAND(say_hi_command,
-              "say-hi",
-              "say-hi: blinks and says hello",
-              &shell_say_hi_process);
+PROCESS(shell_conn_fix_process, "conn-fix");
+SHELL_COMMAND(conn_fix_command,
+              "conn-fix",
+              "conn-fix: reinitializes connection",
+              &shell_conn_fix_process);
 
-PROCESS(shell_round_robin_blink_process, "rr-blink");
+PROCESS(round_robin_blink_process, "rr-blink");
 
 PROCESS(shell_round_robin_start_process, "rr-start");
 SHELL_COMMAND(round_robin_start_command,
@@ -33,13 +33,29 @@ SHELL_COMMAND(round_robin_start_command,
 			  "rr-start: blinks connected motes",
 			  &shell_round_robin_start_process);
 /*---------------------------------------------------------------------------*/
+int transmit_unicast(char *message, uint8_t addr_one);
+
 static void
 recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 {
 	printf("Unicast data received from %d.%d: %s\n",
 			from->u8[0], from->u8[1], (char *)packetbuf_dataptr());
 
-	process_start(&shell_round_robin_blink_process, NULL);
+
+#if RELIABLE == 1
+	/* If receiving "sent" from a prior node, respond back that it was received
+	 * and start the next process.
+	 * If receiving "received" from a prior node, end the failsafe process
+	 */
+	if (strcmp("Sent", (char *)packetbuf_dataptr()) == 1)
+	{
+		transmit_unicast("Received", from->u8[0]);
+		process_start(&round_robin_blink_process, NULL);
+	} else process_exit(&round_robin_blink_process);
+#else 
+	process_start(&round_robin_blink_process, NULL);
+#endif
+
 }
 
 static const struct unicast_callbacks unicast_callbacks = {recv_uc};
@@ -68,22 +84,12 @@ void close_unicast()
 }
 
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(shell_say_hi_process, ev, data)
+PROCESS_THREAD(shell_conn_fix_process, ev, data)
 {
-//	static struct etimer etimer;
-	
 	PROCESS_BEGIN();
-/*
-	leds_off(LEDS_ALL);
-	etimer_set(&etimer, 3 * CLOCK_SECOND);
-	PROCESS_WAIT_EVENT();
-	leds_off(LEDS_ALL);
-
-	char message[6]= "Hello";
-	transmit_mesh(message,1,0);
-*/
 
 	open_unicast();
+
 	PROCESS_END();
 }
 
@@ -99,7 +105,7 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 		etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
 		leds_on(LEDS_ALL);
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
-		transmit_unicast("Hello", next_node);
+		transmit_unicast("Sent", next_node);
 		leds_off(LEDS_ALL);
 	}
 	
@@ -107,7 +113,7 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 }
 
 
-PROCESS_THREAD(shell_round_robin_blink_process, ev, data)
+PROCESS_THREAD(round_robin_blink_process, ev, data)
 {
 	PROCESS_BEGIN();
 
@@ -123,17 +129,26 @@ PROCESS_THREAD(shell_round_robin_blink_process, ev, data)
 	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
 	leds_on(LEDS_ALL);
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
-	transmit_unicast("Hello", next_node);
+	transmit_unicast("Sent", next_node);
 	leds_off(LEDS_ALL);
-	
+
+#if RELIABLE == 1
+	while (1)
+	{
+		etimer_set(&etimer, CLOCK_SECOND);
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+		transmit_unicast("Sent", next_node);
+	}
+#endif
+
 	PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
-void shell_hello_world_init(void)
+void shell_rr_trans_init(void)
 {
 //	runicast_open(&runicast, 144, &runicast_callbacks);
 	open_unicast();
-	shell_register_command(&say_hi_command);
+	shell_register_command(&conn_fix_command);
 	shell_register_command(&round_robin_start_command);
 }
 /*---------------------------------------------------------------------------*/
