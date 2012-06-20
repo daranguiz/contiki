@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "node-id.h"
+#include "global-sensor.h"
 
 //#include "sky-transmission.h"
 #include "net/rime.h"
@@ -14,7 +15,7 @@
 #include <string.h>
 
 #define FIRST_NODE 9
-#define LAST_NODE 11
+#define LAST_NODE 14
 #define FREQUENCY 25
 #define RELIABLE 0
 
@@ -53,7 +54,10 @@ recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 		process_start(&round_robin_blink_process, NULL);
 	} else process_exit(&round_robin_blink_process);
 #else 
-	process_start(&round_robin_blink_process, NULL);
+	if (from->u8[0] == LAST_NODE)
+		return;
+	else
+		process_start(&round_robin_blink_process, (char *)packetbuf_dataptr());
 #endif
 
 }
@@ -101,11 +105,18 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 	{ 
 		static struct etimer etimer0;
 		uint8_t next_node = FIRST_NODE + 1;
-		
+		uint16_t sensor_value;
+		char message[5];
+
+		sensor_init();
+		sensor_value = sensor_read();
+		sensor_uinit();
+		itoa(sensor_value, message, 10);
+
 		etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
 		leds_on(LEDS_ALL);
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
-		transmit_unicast("Sent", next_node);
+		transmit_unicast(message, next_node);
 		leds_off(LEDS_ALL);
 	}
 	
@@ -119,17 +130,29 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 
 	static struct etimer etimer;
 	static uint8_t my_node;
+	static char message[5];
 	my_node = rimeaddr_node_addr.u8[0];
 	static uint8_t next_node;
 	next_node = my_node + 1;
-	
 	if (my_node == LAST_NODE)
-		next_node = FIRST_NODE;
+		next_node = 4;
+
+	static uint16_t new_data;
+	static uint16_t received_data;
+	received_data = datatoint(data);
+	sensor_init();
+	new_data = sensor_read();
+	sensor_uinit();
+	
+	received_data = received_data * (FIRST_NODE - my_node);
+	new_data = new_data + received_data;
+	new_data = new_data / (FIRST_NODE - my_node + 1);
+	itoa(new_data, message, 10);
 
 	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
 	leds_on(LEDS_ALL);
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
-	transmit_unicast("Sent", next_node);
+	transmit_unicast(message, next_node);
 	leds_off(LEDS_ALL);
 
 #if RELIABLE == 1
@@ -151,5 +174,22 @@ void shell_rr_trans_init(void)
 	shell_register_command(&conn_fix_command);
 	shell_register_command(&round_robin_start_command);
 }
+
+uint16_t datatoint(const char *str) 
+{
+    const char *strptr = str;
+
+    if(str == NULL) {
+        return 0;
+    }
+
+    while(*strptr == ' ') {
+        ++strptr;
+    }
+    
+	uint16_t value = atoi(strptr);
+	return value;
+}
+
 /*---------------------------------------------------------------------------*/
 
