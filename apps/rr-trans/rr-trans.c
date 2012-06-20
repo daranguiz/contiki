@@ -15,7 +15,7 @@
 #include <string.h>
 
 #define FIRST_NODE 9
-#define LAST_NODE 14
+#define LAST_NODE 15
 #define FREQUENCY 25
 #define RELIABLE 0
 
@@ -33,8 +33,16 @@ SHELL_COMMAND(round_robin_start_command,
               "rr-start",
 			  "rr-start: blinks connected motes",
 			  &shell_round_robin_start_process);
+
+PROCESS(shell_local_read_test_process, "local-test");
+SHELL_COMMAND(local_read_test_command,
+              "local-test",
+			  "local-test: tests light readings on serial port",
+			  &shell_local_read_test_process);
 /*---------------------------------------------------------------------------*/
 int transmit_unicast(char *message, uint8_t addr_one);
+uint16_t datatoint(const char *str);
+static char *received_string;
 
 static void
 recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
@@ -42,6 +50,9 @@ recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 	printf("Unicast data received from %d.%d: %s\n",
 			from->u8[0], from->u8[1], (char *)packetbuf_dataptr());
 
+   	received_string = (char *)packetbuf_dataptr();	
+	transmit_unicast("Next is packetbuf", 4);
+	transmit_unicast(received_string, 4);
 
 #if RELIABLE == 1
 	/* If receiving "sent" from a prior node, respond back that it was received
@@ -57,7 +68,7 @@ recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 	if (from->u8[0] == LAST_NODE)
 		return;
 	else
-		process_start(&round_robin_blink_process, (char *)packetbuf_dataptr());
+		process_start(&round_robin_blink_process, NULL);
 #endif
 
 }
@@ -106,12 +117,14 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 		static struct etimer etimer0;
 		uint8_t next_node = FIRST_NODE + 1;
 		uint16_t sensor_value;
-		char message[5];
+		static char message[5];
 
 		sensor_init();
 		sensor_value = sensor_read();
 		sensor_uinit();
 		itoa(sensor_value, message, 10);
+
+		transmit_unicast(message, 4);
 
 		etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
 		leds_on(LEDS_ALL);
@@ -130,16 +143,18 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 
 	static struct etimer etimer;
 	static uint8_t my_node;
-	static char message[5];
+	static char *message;
 	my_node = rimeaddr_node_addr.u8[0];
 	static uint8_t next_node;
 	next_node = my_node + 1;
 	if (my_node == LAST_NODE)
-		next_node = 4;
-
+		next_node = FIRST_NODE;
+/*
 	static uint16_t new_data;
 	static uint16_t received_data;
-	received_data = datatoint(data);
+	received_data = atoi(received_string);
+	itoa(received_data, message, 10);
+	transmit_unicast(message, 4);
 	sensor_init();
 	new_data = sensor_read();
 	sensor_uinit();
@@ -148,7 +163,8 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 	new_data = new_data + received_data;
 	new_data = new_data / (FIRST_NODE - my_node + 1);
 	itoa(new_data, message, 10);
-
+*/
+	message = "HOLA";
 	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
 	leds_on(LEDS_ALL);
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
@@ -166,6 +182,27 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 
 	PROCESS_END();
 }
+
+PROCESS_THREAD(shell_local_read_test_process, ev, data)
+{
+	PROCESS_BEGIN();
+
+	/*
+	sensor_init();
+	static uint16_t sensor_value;
+	sensor_value = sensor_read();
+	sensor_uinit();
+	*/
+
+	char *message;
+	message = "123\0";
+	uint16_t i = 12;
+	i = strtol(message, NULL, 10);
+	printf("The number is: %d\n", i);
+
+
+	PROCESS_END();
+}
 /*---------------------------------------------------------------------------*/
 void shell_rr_trans_init(void)
 {
@@ -173,6 +210,7 @@ void shell_rr_trans_init(void)
 	open_unicast();
 	shell_register_command(&conn_fix_command);
 	shell_register_command(&round_robin_start_command);
+	shell_register_command(&local_read_test_command);
 }
 
 uint16_t datatoint(const char *str) 
