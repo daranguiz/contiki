@@ -36,7 +36,7 @@ PROCESS(round_robin_blink_process, "rr-blink");
 PROCESS(shell_round_robin_start_process, "rr-start");
 SHELL_COMMAND(round_robin_start_command,
               "rr-start",
-			  "rr-start: blinks connected motes",
+			  "rr-start: starts the round-robin collection",
 			  &shell_round_robin_start_process);
 
 PROCESS(shell_local_read_test_process, "local-test");
@@ -44,72 +44,14 @@ SHELL_COMMAND(local_read_test_command,
               "local-test",
 			  "local-test: tests light readings on serial port",
 			  &shell_local_read_test_process);
+
+PROCESS(shell_round_robin_end_process, "rr-end");
+SHELL_COMMAND(round_robin_end_command,
+              "rr-end",
+			  "rr-end: ends the round-robin collection",
+			  &shell_round_robin_end_process);
 /*---------------------------------------------------------------------------*/
-int transmit_runicast(char *message, uint8_t addr_one);
-uint16_t datatoint(const char *str);
 static char *received_string;
-/*
-static void
-recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
-{
-	printf("Unicast data received from %d.%d: %s\n",
-			from->u8[0], from->u8[1], (char *)packetbuf_dataptr());
-
-   	received_string = (char *)packetbuf_dataptr();	
-
-#if RELIABLE == 1
-	 If receiving "sent" from a prior node, respond back that it was received
-	 * and start the next process.
-	 * If receiving "received" from a prior node, end the failsafe process
-	 
-	if (strcmp("Received", received_string) && 
-		process_is_running(&round_robin_blink_process))
-	{
-		//process_exit(&round_robin_blink_process);
-		//transmit_unicast("DID NOT FAIL RECEIVE FUNCTION", SINK);
-	}
-	else
-   	{
-		transmit_unicast("Received", from->u8[0]);
-		if (rimeaddr_node_addr.u8[0] != SINK)
-			process_start(&round_robin_blink_process, NULL);
-	}
-
-#else 
-//	if (from->u8[0] == LAST_NODE)
-//		return;
-//	else
-		process_start(&round_robin_blink_process, NULL);
-#endif
-
-}
-
-static const struct unicast_callbacks unicast_callbacks = {recv_uc};
-
-static struct unicast_conn uc;
-
-int transmit_unicast(char *message, uint8_t addr_one)
-{
-	rimeaddr_t addr;
-	packetbuf_copyfrom(message, strlen(message));
-	addr.u8[0] = addr_one;
-	addr.u8[1] = 0;
-	if (!rimeaddr_cmp(&addr, &rimeaddr_node_addr))
-		return unicast_send(&uc, &addr);
-	else return 0;
-}
-
-void open_unicast()
-{
-	unicast_open(&uc, 146, &unicast_callbacks);
-}
-
-void close_unicast()
-{
-	unicast_close(&uc);
-}
-*/
-
 
 struct history_entry
 {
@@ -216,6 +158,9 @@ PROCESS_THREAD(shell_conn_fix_process, ev, data)
 PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 {
 	PROCESS_BEGIN();
+	
+	open_runicast();
+	open_unicast();
 
 	if (rimeaddr_node_addr.u8[0] == FIRST_NODE)
 	{ 
@@ -296,6 +241,13 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 	PROCESS_END();
 }
 
+PROCESS_THREAD(shell_round_robin_end_process, ev, data)
+{
+	close_unicast();
+	close_runicast();
+	process_exit(&round_robin_blink_process);
+}
+
 PROCESS_THREAD(shell_local_read_test_process, ev, data)
 {
 	PROCESS_BEGIN();
@@ -326,14 +278,12 @@ PROCESS_THREAD(shell_local_read_test_process, ev, data)
 /*---------------------------------------------------------------------------*/
 void shell_rr_trans_init(void)
 {
-//	runicast_open(&runicast, 144, &runicast_callbacks);
 	open_runicast();
-//	list_init(history_table);
-//	memb_init(&history_mem);
 	open_unicast();
 	shell_register_command(&conn_fix_command);
 	shell_register_command(&round_robin_start_command);
 	shell_register_command(&local_read_test_command);
+	shell_register_command(&round_robin_end_command);
 }
 
 /*
