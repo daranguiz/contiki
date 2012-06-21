@@ -1,36 +1,22 @@
+/* This program sequentially collects sensor readings and passes on a cumulative
+ * average, beginning with the first node listed. At the end of the sequence,
+ * the cumulative average is sent to the sink node, and the sequence starts over.
+ * The nodes are referenced in the style of a singly-linked list, with only the first
+ * and last nodes aware of their absolute position in the list, and the rest only
+ * aware of the node directly succeeding them..
+ * Author: Dario Aranguiz
+ */
+
 #include "rr-trans.h"
-#include "contiki.h"
-#include "shell.h"
-
-#include "dev/leds.h"
-#include "dev/serial-line.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include "node-id.h"
-#include "lib/list.h"
-#include "lib/memb.h"
-#include "sky-transmission.h"
-
-#include "global-sensor.h"
-#include "net/rime.h"
-#include <string.h>
 
 #define FIRST_NODE 9
 #define LAST_NODE 15
+#define SINK_NODE 4
 #define FREQUENCY 15
-#define RELIABLE 0 
-#define SINK 4
-#define TIME_OUT 3
 #define MAX_RETRANSMISSIONS 4
 #define NUM_HISTORY_ENTRIES 4
 
 /*---------------------------------------------------------------------------*/
-PROCESS(shell_conn_fix_process, "conn-fix");
-SHELL_COMMAND(conn_fix_command,
-              "conn-fix",
-              "conn-fix: reinitializes connection",
-              &shell_conn_fix_process);
-
 PROCESS(round_robin_blink_process, "rr-blink");
 
 PROCESS(shell_round_robin_start_process, "rr-start");
@@ -39,12 +25,6 @@ SHELL_COMMAND(round_robin_start_command,
 			  "rr-start: starts the round-robin collection",
 			  &shell_round_robin_start_process);
 
-PROCESS(shell_local_read_test_process, "local-test");
-SHELL_COMMAND(local_read_test_command,
-              "local-test",
-			  "local-test: tests light readings on serial port",
-			  &shell_local_read_test_process);
-
 PROCESS(shell_round_robin_end_process, "rr-end");
 SHELL_COMMAND(round_robin_end_command,
               "rr-end",
@@ -52,16 +32,13 @@ SHELL_COMMAND(round_robin_end_command,
 			  &shell_round_robin_end_process);
 /*---------------------------------------------------------------------------*/
 static char *received_string;
-
-struct history_entry
-{
-	struct history_entry *next;
-	rimeaddr_t addr;
-	uint8_t seq;
-};
 LIST(history_table);
 MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 
+
+/* The only modifications to this, taken straight from the Rime example for 
+ * runicast, are on lines 67-72.
+ */
 static void
 recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 {
@@ -69,9 +46,7 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 	for (e = list_head(history_table); e != NULL; e = e->next)
 	{
 		if (rimeaddr_cmp(&e->addr, from))
-		{
 			break;
-		}
 	}
 	if (e == NULL)
 	{
@@ -96,8 +71,9 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 	printf("Runicast message received from %d.%d: %s\n",
 	       from->u8[0], from->u8[1], (char *)packetbuf_dataptr());
 
+	/* Receiving a message triggers the next process in the sequence to begin */
 	received_string = (char *)packetbuf_dataptr();
-	if (rimeaddr_node_addr.u8[0] != SINK)
+	if (rimeaddr_node_addr.u8[0] != SINK_NODE)
 		process_start(&round_robin_blink_process, NULL);
 }
 
@@ -107,15 +83,19 @@ sent_runicast(struct runicast_conn *c, const rimeaddr_t *to, uint8_t retransmiss
 	printf("Runicast message sent to %d.%d, retransmissions %d\n",
 	       to->u8[0], to->u8[1], retransmissions);
 }
+
 static void
 timedout_runicast(struct runicast_conn *c, const rimeaddr_t *to, uint8_t retransmissions)
 {
 	printf("Runicast message timed out when sending to %d.%d, retransmissions %d\n",
 	       to->u8[0], to->u8[1], retransmissions);
 }
-static const struct runicast_callbacks runicast_callbacks = {recv_runicast,
-								sent_runicast,
-								timedout_runicast};
+
+static const struct runicast_callbacks runicast_callbacks = {
+                         recv_runicast,
+						 sent_runicast,
+						 timedout_runicast};
+
 static struct runicast_conn runicast;
 
 int transmit_runicast(char *message, uint8_t addr_one)
@@ -125,7 +105,7 @@ int transmit_runicast(char *message, uint8_t addr_one)
 	recv.u8[0] = addr_one;
 	recv.u8[1] = 0;
 	packetbuf_copyfrom(message, strlen(message));
-	runicast_send(&runicast, &recv, MAX_RETRANSMISSIONS);
+	return runicast_send(&runicast, &recv, MAX_RETRANSMISSIONS);
 }
 
 void open_runicast(void)
@@ -139,22 +119,11 @@ void close_runicast(void)
 {
 	runicast_close(&runicast);
 }
-
-
-
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(shell_conn_fix_process, ev, data)
-{
-	PROCESS_BEGIN();
 
-	open_runicast();
-	open_unicast();
-//	list_init(history_table);
-//	memb_init(&history_mem);
-
-	PROCESS_END();
-}
-
+/* This process initializes the sequence at the first node, but only ever runs
+ * once during a given session of data collection.
+ */
 PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 {
 	PROCESS_BEGIN();
@@ -162,13 +131,16 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 	open_runicast();
 	open_unicast();
 
+	/* Data collection always begins with the first node */
 	if (rimeaddr_node_addr.u8[0] == FIRST_NODE)
 	{ 
+		/* Initialization of the first node's ID and neighboring node */
 		static struct etimer etimer0;
 		uint8_t next_node = FIRST_NODE + 1;
 		uint16_t sensor_value;
 		static char message[5];
 
+		/* Collects data from the light sensor and converts it to a string */
 		etimer_set(&etimer0, CLOCK_SECOND/8);
 		sensor_init();
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
@@ -176,6 +148,7 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 		sensor_uinit();
 		itoa(sensor_value, message, 10);
 
+		/* Sends data to the second node in the sequence */
     	etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
 		leds_on(LEDS_ALL);
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
@@ -186,11 +159,17 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 	PROCESS_END();
 }
 
-
+/* This process performs the brunt of the data transmission, as well as
+ * the data collection and the calculation of the average. Instead of 
+ * using logical loops, a recursive approach is taken, with each
+ * prior process calling the next process, and the prior process terminating
+ * itself after the next process is called.
+ */
 PROCESS_THREAD(round_robin_blink_process, ev, data)
 {
 	PROCESS_BEGIN();
 
+	/* Initialization of node ID's and neighbor's node ID */
 	static struct etimer etimer;
 	static uint8_t my_node;
 	static char message[5];
@@ -200,6 +179,7 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 	if (my_node == LAST_NODE)
 		next_node = FIRST_NODE;
 
+	/* Sensor data is collected and the received message is converted to an integer */
 	static uint16_t new_data;
 	static uint16_t received_data;
 	received_data = atoi(received_string);
@@ -209,69 +189,35 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 	new_data = sensor_read();
 	sensor_uinit();
 		
+	/* Cumulative average is calculated and converted back to a string */
 	received_data = received_data * (my_node - FIRST_NODE);
 	new_data = new_data + received_data;
 	new_data = new_data / (my_node - FIRST_NODE + 1);
 	itoa(new_data, message, 10);
 
+	/* Message is sent to the next node, and the sink node if it is the last node */
 	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
 	leds_on(LEDS_ALL);
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
 	if (my_node == LAST_NODE)
 	{
-		transmit_unicast(message, SINK);
+		transmit_unicast(message, SINK_NODE);
 		transmit_runicast("0", next_node);
 	} else
 		transmit_runicast(message, next_node);
 	leds_off(LEDS_ALL);
 
-#if RELIABLE == 1
-	etimer_set(&etimer, CLOCK_SECOND/TIME_OUT);
-			
-	while (!strcmp(received_string, "Received"))
-	{
-		if (etimer_expired(&etimer) && !strcmp(received_string, "Received"))
-		{
-			transmit_unicast("Resending data", SINK);
-			transmit_unicast(message, next_node);
-		}
-	}
-#endif
-
 	PROCESS_END();
 }
 
+/* This process simply terminates the session */
 PROCESS_THREAD(shell_round_robin_end_process, ev, data)
-{
-	close_unicast();
-	close_runicast();
-	process_exit(&round_robin_blink_process);
-}
-
-PROCESS_THREAD(shell_local_read_test_process, ev, data)
 {
 	PROCESS_BEGIN();
 
-	/*
-	sensor_init();
-	static uint16_t sensor_value;
-	sensor_value = sensor_read();
-	sensor_uinit();
-	*/
-	
-	/*
-	char *message;
-	message = "123\0";
-	uint16_t i = 12;
-	i = strtol(message, NULL, 10);
-	printf("The number is: %d\n", i);
-	*/
-
-	static char *test_string;
-   	*test_string = "Received\0";
-	if (strcmp(test_string, "Received"))
-		printf("Equal\n");
-	else printf("Not equal\n");
+	close_unicast();
+	close_runicast();
+	process_exit(&round_robin_blink_process);
 	
 	PROCESS_END();
 }
@@ -280,28 +226,7 @@ void shell_rr_trans_init(void)
 {
 	open_runicast();
 	open_unicast();
-	shell_register_command(&conn_fix_command);
 	shell_register_command(&round_robin_start_command);
-	shell_register_command(&local_read_test_command);
 	shell_register_command(&round_robin_end_command);
 }
-
-/*
-uint16_t datatoint(const char *str) 
-{
-    const char *strptr = str;
-
-    if(str == NULL) {
-        return 0;
-    }
-
-    while(*strptr == ' ') {
-        ++strptr;
-    }
-    
-	uint16_t value = atoi(strptr);
-	return value;
-}
-*/
 /*---------------------------------------------------------------------------*/
-
