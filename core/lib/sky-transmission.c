@@ -42,12 +42,12 @@ recv(struct mesh_conn *c, const rimeaddr_t *from, uint8_t hops)
 
 const static struct mesh_callbacks callbacks = {recv, sent, timedout};
 
-int transmit_mesh(char *message, uint8_t addr_one, uint8_t addr_two)
+int transmit_mesh(char *message, uint8_t addr_one)
 {
 	rimeaddr_t addr;
 	packetbuf_copyfrom(message, strlen(message));
 	addr.u8[0] = addr_one;
-	addr.u8[1] = addr_two;
+	addr.u8[1] = 0;
 	return mesh_send(&mesh, &addr);
 }
 
@@ -105,18 +105,17 @@ recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 	printf("Unicast data received from %d.%d: %s (%d)\n",
 			from->u8[0], from->u8[1],
 			(char *)packetbuf_dataptr(), packetbuf_datalen());
-	from_node = from->u8[0];
 }
 
 static const struct unicast_callbacks unicast_callbacks = {recv_uc};
 static struct unicast_conn uc;
 
-int transmit_unicast(char *message, uint8_t addr_one, uint8_t addr_two)
+int transmit_unicast(char *message, uint8_t addr_one)
 {
 	rimeaddr_t addr;
 	packetbuf_copyfrom(message, strlen(message));
 	addr.u8[0] = addr_one;
-	addr.u8[1] = addr_two;
+	addr.u8[1] = 0;
 	if (!rimeaddr_cmp(&addr, &rimeaddr_node_addr)) 
 		return unicast_send(&uc, &addr);
 	else return 0;
