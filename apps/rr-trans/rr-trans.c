@@ -7,9 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "node-id.h"
-#include "global-sensor.h"
 
-//#include "sky-transmission.h"
 #include "net/rime.h"
 #include "net/rime/unicast.h"
 #include <string.h>
@@ -52,18 +50,16 @@ recv_uc(struct unicast_conn *c, const rimeaddr_t *from)
 			from->u8[0], from->u8[1], (char *)packetbuf_dataptr());
 
    	received_string = (char *)packetbuf_dataptr();	
-//	transmit_unicast("Next is packetbuf", 4);
-//	transmit_unicast(received_string, 4);
 
 #if RELIABLE == 1
 	/* If receiving "sent" from a prior node, respond back that it was received
 	 * and start the next process.
 	 * If receiving "received" from a prior node, end the failsafe process
 	 */
-	if (strcmp("Sent", (char *)packetbuf_dataptr()) == 1)
+	if (strcmp("Received", received_string) == 1)
 	{
-		transmit_unicast("Received", from->u8[0]);
 		process_start(&round_robin_blink_process, NULL);
+	
 	} else process_exit(&round_robin_blink_process);
 #else 
 //	if (from->u8[0] == LAST_NODE)
@@ -125,9 +121,9 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 		sensor_uinit();
 		itoa(sensor_value, message, 10);
 
-		etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
+	//	etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
 		leds_on(LEDS_ALL);
-		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
+//		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
 		transmit_unicast(message, next_node);
 		leds_off(LEDS_ALL);
 	}
@@ -157,18 +153,25 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 	sensor_init();
 	new_data = sensor_read();
 	sensor_uinit();
+	itoa(new_data, message, 10);
+	transmit_unicast(message, SINK);
 	
 	received_data = received_data * (my_node - FIRST_NODE);
 	new_data = new_data + received_data;
 	new_data = new_data / (my_node - FIRST_NODE + 1);
 	itoa(new_data, message, 10);
 
-	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
+//	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
 	leds_on(LEDS_ALL);
-	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
-	transmit_unicast(message, next_node);
+//	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+//	transmit_unicast(message, next_node);
 	if (my_node == LAST_NODE)
+	{
 		transmit_unicast(message, SINK);
+		transmit_unicast("0", FIRST_NODE);
+	} else {
+	   	transmit_unicast(message, next_node);
+	}
 	leds_off(LEDS_ALL);
 
 #if RELIABLE == 1
