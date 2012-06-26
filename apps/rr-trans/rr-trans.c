@@ -32,6 +32,7 @@ SHELL_COMMAND(round_robin_end_command,
 			  &shell_round_robin_end_process);
 /*---------------------------------------------------------------------------*/
 static char *received_string;
+static uint8_t healing_offset = 0;
 LIST(history_table);
 MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 
@@ -141,7 +142,7 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 		static char message[5];
 
 		/* Collects data from the light sensor and converts it to a string */
-		etimer_set(&etimer0, CLOCK_SECOND/8);
+		etimer_set(&etimer0, CLOCK_SECOND/16);
 		sensor_init();
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
 		sensor_value = sensor_read();
@@ -149,9 +150,9 @@ PROCESS_THREAD(shell_round_robin_start_process, ev, data)
 		itoa(sensor_value, message, 10);
 
 		/* Sends data to the second node in the sequence */
-    	etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
+  //  	etimer_set(&etimer0, CLOCK_SECOND/FREQUENCY);
 		leds_on(LEDS_ALL);
-		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
+	//	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
 		transmit_runicast(message, next_node);
 		leds_off(LEDS_ALL);
 	}
@@ -178,33 +179,64 @@ PROCESS_THREAD(round_robin_blink_process, ev, data)
 	next_node = my_node + 1;
 	if (my_node == LAST_NODE)
 		next_node = FIRST_NODE;
+	static uint8_t sent = 0;
 
 	/* Sensor data is collected and the received message is converted to an integer */
 	static uint16_t new_data;
 	static uint16_t received_data;
 	received_data = atoi(received_string);
-	etimer_set(&etimer, CLOCK_SECOND/8);
+	etimer_set(&etimer, CLOCK_SECOND/16);
 	sensor_init();
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
 	new_data = sensor_read();
 	sensor_uinit();
 		
 	/* Cumulative average is calculated and converted back to a string */
-	received_data = received_data * (my_node - FIRST_NODE);
+	received_data = received_data * (my_node - FIRST_NODE - healing_offset);
 	new_data = new_data + received_data;
-	new_data = new_data / (my_node - FIRST_NODE + 1);
+	new_data = new_data / (my_node - FIRST_NODE + 1 - healing_offset);
 	itoa(new_data, message, 10);
 
 	/* Message is sent to the next node, and the sink node if it is the last node */
-	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
+//	etimer_set(&etimer, CLOCK_SECOND/FREQUENCY);
 	leds_on(LEDS_ALL);
-	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+//	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
 	if (my_node == LAST_NODE)
 	{
 		transmit_unicast(message, SINK_NODE);
 		transmit_runicast("0", next_node);
-	} else
+	} 
+	else
+	{
 		transmit_runicast(message, next_node);
+	/*	while (sent != 1)
+		{
+
+			if (transmit_runicast(message, next_node))
+			{
+				transmit_unicast("Successful transmission", SINK_NODE);
+				sent = 1;
+			}
+			else if (next_node = LAST_NODE)
+			{
+				transmit_unicast("Last node has failed, ending sequence", SINK_NODE);
+				process_start(&shell_round_robin_end_process, NULL);
+			}
+			else if (next_node = FIRST_NODE)
+			{
+				transmit_unicast("First node has failed, ending sequence", SINK_NODE);
+				process_start(&shell_round_robin_end_process, NULL);
+			}
+			else
+			{
+				next_node++;
+				healing_offset++;
+				sent = 0;
+			}
+		} */
+	}
+				
+
 	leds_off(LEDS_ALL);
 
 	PROCESS_END();
