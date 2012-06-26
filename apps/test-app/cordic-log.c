@@ -1,5 +1,3 @@
-/* http://www.quinapalus.com/efunc.html */
-
 #include <stdio.h>
 
 #define NUM_TERMS 16

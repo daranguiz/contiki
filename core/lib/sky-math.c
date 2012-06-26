@@ -18,10 +18,11 @@ unsigned short log_table[NUM_TERMS] = { 7098, //ln(32)
 							 8, //ln(257/256)
 							 4, //ln(513/512)
 							 2, //ln(1025/1024)
-							 1, //ln(2049/2048) 
+							 1 //ln(2049/2048) 
 };
 
-unsigned short k_table[NUM_TERMS] = {32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048};
+unsigned short k_table[NUM_TERMS] = 
+               {32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048};
 
 #elif PRECISION == 10
 unsigned short log_table[NUM_TERMS] = { 4259, //ln(64)
@@ -39,10 +40,11 @@ unsigned short log_table[NUM_TERMS] = { 4259, //ln(64)
 							 8, //ln(129/128)
 							 4, //ln(257/256)
 							 2, //ln(513/512)
-							 1, //ln(1025/1024)
+							 1 //ln(1025/1024)
 };
 
-unsigned short k_table[NUM_TERMS] = { 64, 32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
+unsigned short k_table[NUM_TERMS] = 
+               { 64, 32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
 
 #elif PRECISION == 9
 unsigned short log_table[NUM_TERMS] = { 2484, //ln(128)
@@ -60,15 +62,16 @@ unsigned short log_table[NUM_TERMS] = { 2484, //ln(128)
 							 8, //ln(65/64)
 							 4, //ln(129/128)
 							 2, //ln(257/256)
-							 1, //ln(513/512)
+							 1 //ln(513/512)
 };
 
-unsigned short k_table[NUM_TERMS] = {128, 64, 32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 256, 512 };
+unsigned short k_table[NUM_TERMS] = 
+               {128, 64, 32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 256, 512 };
 
 #endif
 
 #define ATAN_TAB_N 16
-int atantable[ATAN_TAB_N] = {  0x4000,   //atan(2^0) = 45 degrees
+unsigned short atantable[ATAN_TAB_N] = {  0x4000,   //atan(2^0) = 45 degrees
                                 0x25C8,   //atan(2^-1) = 26.5651
                                 0x13F6,   //atan(2^-2) = 14.0362
                                 0x0A22,   //7.12502
@@ -198,7 +201,7 @@ unsigned short mysqrt(unsigned short var) {
 signed short qsin(signed short theta)
 {
 	signed short sin_result, cos_result;
-	void cordic_sincos(theta, 16, &sin_result, &cos_result);
+	cordic_sincos(theta, 16, &sin_result, &cos_result);
 	return sin_result;
 }
 
@@ -206,15 +209,16 @@ signed short qsin(signed short theta)
 signed short qcos(signed short theta)
 {
 	signed short sin_result, cos_result;
-	void cordic_sincos(theta, 16, &sin_result, &cos_result);
+	cordic_sincos(theta, 16, &sin_result, &cos_result);
 	return cos_result;
 }
 
 // A helper function for qsin and qcos
-void cordic_sincos(int theta, 
+void cordic_sincos(signed short theta, 
                    char iterations, 
-                   int *sin_result,
-                   int *cos_result){
+                   signed short *sin_result,
+                   signed short *cos_result) 
+{
   signed short sigma, s, x1, x2, y, i, quadAdj, shift;
   unsigned short *atanptr = atantable;
 

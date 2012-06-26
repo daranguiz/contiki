@@ -11,6 +11,7 @@
 #include "lib/list.h"
 #include "lib/memb.h"
 #include "sky-transmission.h"
+#include "sky-math.h"
 #include "global-sensor.h"
 #include "net/rime.h"
 #include <string.h>
