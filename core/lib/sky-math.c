@@ -1,4 +1,6 @@
 #include "lib/sky-math.h"
+#include <stdio.h>
+
 #define NUM_TERMS 16
 #define PRECISION 11
 
@@ -146,10 +148,12 @@ unsigned short mylog(unsigned short var) {
 }
 
 // Note: precision is currently 11, or y/2048 for real answer
-signed short qlog(unsigned short x)
+signed short qlog(unsigned short var)
 {
-	unsigned short y = 0;
-	unsigned short counter = 0;	
+	static unsigned short y = 0;
+	static signed short counter = 0;
+	static unsigned x = 0;
+	x = var;	
 
 	for (counter = 0; counter < (23 * (12 - PRECISION)); counter++)
 	{
@@ -158,21 +162,30 @@ signed short qlog(unsigned short x)
 	}
 
 	y = counter * log_table[(15 - PRECISION)];
-	x = x * (1 << PRECISION) / (1 << counter);
-
+	counter = PRECISION - counter;
+	if (counter > 1)
+		x = x * (1 << counter);
+	else
+	{
+		counter = counter * -1;
+		x = x / (1 << (counter));
+		counter = counter * -1;
+	}
+	
 	for (counter = 0; counter < NUM_TERMS; counter++)
 	{
 		if (counter < (16 - PRECISION))
 		{
-			while (k_table[counter] * x <= (1 << PRECISION))
+			if (k_table[counter] * x <= (1 << PRECISION))
 			{
 				x = x * k_table[counter];
 				y = y - log_table[counter];
 			}
 		}
-		else while ((k_table[counter] + 1) * x / k_table[counter] <= (1 << PRECISION))
+		else if (x / k_table[counter] * (k_table[counter] + 1) + x % k_table[counter] 
+				 <= (1 << PRECISION))
 		{
-			x = x * (k_table[counter] + 1) / k_table[counter];
+			x = x / k_table[counter] * (k_table[counter] + 1) + x % k_table[counter];
 			y = y - log_table[counter];
 		}
 	}

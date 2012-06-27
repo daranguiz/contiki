@@ -5,7 +5,7 @@
 
 
 #if PRECISION == 11
-int log_table[NUM_TERMS] = { 7098, //ln(32)
+unsigned short log_table[NUM_TERMS] = { 7098, //ln(32)
                              5678, //ln(16)
                              4259, //ln(8)
 							 2839, //ln(4)
@@ -23,7 +23,7 @@ int log_table[NUM_TERMS] = { 7098, //ln(32)
 							 1, //ln(2049/2048) 
 };
 
-int k_table[NUM_TERMS] = {32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048};
+unsigned short k_table[NUM_TERMS] = {32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048};
 
 #elif PRECISION == 10
 int log_table[NUM_TERMS] = { 4259, //ln(64)
@@ -72,11 +72,11 @@ int k_table[NUM_TERMS] = {128, 64, 32, 16, 8, 4, 2, 2, 4, 8, 16, 32, 64, 128, 25
 
 int main()
 {
-	int x = 0;
-	int y = 0;
-	int counter = 0;
+	unsigned short x = 0;
+	unsigned short y = 0;
+	unsigned short counter = 0;
 	printf("Value for x? ");
-	scanf("%d", &x);
+	scanf("%hd", &x);
 	
 
 	for (counter = 0; counter < (23 * (12 - PRECISION)); counter++)
@@ -98,12 +98,12 @@ int main()
 				y = y - log_table[counter];
 			}
 		}
-		else while ((k_table[counter] + 1) * x / k_table[counter] <= (1 << PRECISION))
+		else if (x * (k_table[counter] + 1) / k_table[counter] <= (1 << PRECISION))
 		{
 			x = x * (k_table[counter] + 1) / k_table[counter];
 			y = y - log_table[counter];
 		}
 	}
 
-	printf("ln(x) in Q%d = %d\nln(x) by integer approximation = %d\n", PRECISION, y, y/(1 << PRECISION));
+	printf("ln(x) in Q%d = %hd\nln(x) by integer approximation = %hd\n", PRECISION, y, y/(1 << PRECISION));
 }

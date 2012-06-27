@@ -11,15 +11,18 @@ PROCESS_THREAD(shell_test_app_process, ev, data)
 {
 	PROCESS_BEGIN();
 
+	static signed short pre_log = 32000;
+	static signed short pre_sin = 361;
+	static signed short pre_cos = -361;
+	static signed short log_value = 0;
 	static signed short sin_value = 0;
 	static signed short cos_value = 0;
-	static signed short log_value = 0;
-	sin_value = qsin(53);
-	cos_value = qcos(53);
-	log_value = qlog(53);
+	sin_value = qsin(pre_sin);
+	cos_value = qcos(pre_cos);
+	log_value = qlog(pre_log);
 
-	printf("Sine of 53 = %d\nCosine of 53 = %d\nLog of 655 = %d\n",
-			sin_value, cos_value, log_value);
+	printf("Log of %d = %d\nSin of %d = %d\nCos of %d = %d\n",
+			pre_log, log_value, pre_sin, sin_value, pre_cos, cos_value);
 	
 	PROCESS_END();
 }
