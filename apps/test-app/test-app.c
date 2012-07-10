@@ -1,4 +1,7 @@
 #include "test-app.h"
+#include "dev/leds.h"
+#include "dev/watchdog.h"
+#include "stdio.h"
 
 /*---------------------------------------------------------------------------*/
 PROCESS(shell_test_app_process, "test-app");
@@ -7,25 +10,62 @@ SHELL_COMMAND(test_command,
               "test-app: runs a test app",
               &shell_test_app_process);
 /*---------------------------------------------------------------------------*/
+struct blinker {
+	struct pt blink_pt;
+	struct etimer etimer;
+	int led;
+	int i;
+};
+
+
+
+static
+PT_THREAD(blink(struct blinker *b))
+{
+	PT_BEGIN(&b->blink_pt);
+
+	printf("PT Started\n");
+//	PT_YIELD(&b->blink_pt);
+	watchdog_stop();
+	
+	for (b->i = 0; b->i < 100; b->i++)
+	{
+		//etimer_set(&b->etimer, 3 * CLOCK_SECOND);
+		leds_on(b->led);
+		//PT_WAIT_UNTIL(&b->blink_pt, etimer_expired(&b->etimer));	
+		clock_delay(4000);
+		leds_off(b->led);
+		clock_delay(4000);
+		printf("Iterated");
+	}
+	
+	watchdog_start();
+	printf("PT Ended\n");
+
+	PT_END(&b->blink_pt);
+}
+
 PROCESS_THREAD(shell_test_app_process, ev, data)
 {
 	PROCESS_BEGIN();
+	static struct blinker red, green, blue;	
+	red.led = LEDS_RED;
+	green.led = LEDS_GREEN;
+	blue.led = LEDS_BLUE;
 
-	static signed short pre_log = 32000;
-	static signed short pre_sin = 361;
-	static signed short pre_cos = -361;
-	static signed short log_value = 0;
-	static signed short sin_value = 0;
-	static signed short cos_value = 0;
-	sin_value = qsin(pre_sin);
-	cos_value = qcos(pre_cos);
-	log_value = qlog(pre_log);
+	PT_INIT(&red.blink_pt);
+	PT_INIT(&blue.blink_pt);
+	PT_INIT(&green.blink_pt);
 
-	printf("Log of %d = %d\nSin of %d = %d\nCos of %d = %d\n",
-			pre_log, log_value, pre_sin, sin_value, pre_cos, cos_value);
-	
+	PT_SCHEDULE(blink(&red));
+	PT_SCHEDULE(blink(&blue));
+	PT_SCHEDULE(blink(&green));
+
+
+	printf("Process ended\n");
 	PROCESS_END();
 }
+	
 /*---------------------------------------------------------------------------*/
 void shell_test_app_init()
 {
