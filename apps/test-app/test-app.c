@@ -48,7 +48,7 @@ PT_THREAD(blink(struct blinker *b))
 PROCESS_THREAD(shell_test_app_process, ev, data)
 {
 	PROCESS_BEGIN();
-	static struct blinker red, green, blue;	
+/*	static struct blinker red, green, blue;	
 	red.led = LEDS_RED;
 	green.led = LEDS_GREEN;
 	blue.led = LEDS_BLUE;
@@ -60,7 +60,15 @@ PROCESS_THREAD(shell_test_app_process, ev, data)
 	PT_SCHEDULE(blink(&red));
 	PT_SCHEDULE(blink(&blue));
 	PT_SCHEDULE(blink(&green));
-
+*/
+	static struct etimer etimer;
+	etimer_set(&etimer, CLOCK_SECOND*2);
+	leds_on(LEDS_ALL);
+	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+	leds_off(LEDS_ALL);
+	
+	watchdog_stop();	
+	_BIS_SR(GIE | SCG0 | SCG1 | CPUOFF); 
 
 	printf("Process ended\n");
 	PROCESS_END();
