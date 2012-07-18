@@ -68,7 +68,7 @@ PROCESS_THREAD(shell_test_app_process, ev, data)
 	leds_off(LEDS_ALL);
 	
 	watchdog_stop();	
-	_BIS_SR(GIE | SCG0 | SCG1 | CPUOFF); 
+	__bis_SR_register(LPM3_bits + GIE);
 
 	printf("Process ended\n");
 	PROCESS_END();
