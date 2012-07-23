@@ -9,7 +9,7 @@
 #define FIRST_NODE 9 
 #define LAST_NODE 15
 #define SINK_NODE 1 
-#define SLEEP_TIMEOUT 60
+#define SLEEP_TIMEOUT 20
 #define NUM_HISTORY_ENTRIES 4
 #define MAX_RETRANSMISSIONS 4
 
@@ -143,20 +143,27 @@ PROCESS_THREAD(shell_sleepy_trilat_start_process, ev, data)
 	if (my_node != SINK_NODE)
 	{	
 		static struct etimer etimer0;
-		uint16_t sensor_value;
+		uint16_t sensor_value = 0;
 		static char message[4];
-	
-//		etimer_set(&etimer, rand()%15*CLOCK_SECOND + rand()%1000*CLOCK_SECOND/1000);
+		static int i = 0;
+		
+		etimer_set(&etimer0, CLOCK_SECOND/16);
+		sensor_init();
+//		leds_on(LEDS_ALL);
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
+		for (i = 1; i <= 100; i++)
+		{
+			etimer_set(&etimer0, CLOCK_SECOND/50);
+			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));			
+			sensor_value = (sensor_read() + sensor_value*(i-1)) / i;
+		}
+		sensor_uinit();
+		
 		etimer_set(&etimer0, CLOCK_SECOND * (my_node - FIRST_NODE + 1));
 		leds_on(LEDS_ALL);
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
 		leds_off(LEDS_ALL);	
 
-		etimer_set(&etimer0, CLOCK_SECOND/16);
-		sensor_init();
-		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
-		sensor_value = sensor_read();
-		sensor_uinit();
 		itoa(sensor_value, message, 10);
 		strcat(message, "!\0");
 		my_noise = sensor_value;
