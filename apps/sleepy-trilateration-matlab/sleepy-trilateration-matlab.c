@@ -34,7 +34,7 @@ LIST(history_table);
 MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 static uint8_t my_node = 0;
 static uint16_t sleep_time = 0;
-static int16_t my_noise = 0;
+static uint16_t my_noise = 0;
 
 static void
 recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
@@ -143,7 +143,6 @@ PROCESS_THREAD(shell_sleepy_trilat_start_process, ev, data)
 	if (my_node != SINK_NODE)
 	{	
 		static struct etimer etimer0;
-		uint16_t sensor_value = 0;
 		static char message[4];
 		static int i = 0;
 		
@@ -155,18 +154,18 @@ PROCESS_THREAD(shell_sleepy_trilat_start_process, ev, data)
 		{
 			etimer_set(&etimer0, CLOCK_SECOND/50);
 			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));			
-			sensor_value = (sensor_read() + sensor_value*(i-1)) / i;
+			my_noise = sensor_read() + my_noise;
 		}
 		sensor_uinit();
+		my_noise = my_noise / 100; 
 		
 		etimer_set(&etimer0, CLOCK_SECOND * (my_node - FIRST_NODE + 1));
 		leds_on(LEDS_ALL);
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer0));
 		leds_off(LEDS_ALL);	
 
-		itoa(sensor_value, message, 10);
+		itoa(my_noise, message, 10);
 		strcat(message, "!\0");
-		my_noise = sensor_value;
 
 		transmit_runicast(message, SINK_NODE);
 
@@ -181,7 +180,7 @@ PROCESS_THREAD(node_read_process, ev, data)
 	PROCESS_BEGIN();
 	
 	static struct etimer etimer;
-	int16_t sensor_value = 0;
+	static int16_t sensor_value = 0;
 	static char message[3];
 	
 	etimer_set(&etimer, CLOCK_SECOND * sleep_time);
