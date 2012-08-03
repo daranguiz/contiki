@@ -5,6 +5,10 @@
 
 
 #include "sleepy-cusum-node.h"
+#define MU_VALUE 2000
+// Below are two bounds for ad-cusum
+#define ZK_BOUND 35
+#define DK_BOUND 7
 
 /*---------------------------------------------------------------------------*/
 PROCESS(shell_sleepy_cusum_process, "Sleepy-CUSUM Process");
@@ -12,6 +16,12 @@ SHELL_COMMAND(scusum_command,
               "scusum",
 			  "scusum: Starts sleepy-CUSUM process",
 			  &shell_sleepy_cusum_process);
+
+PROCESS(shell_sleepy_adcusum_process, "Sleepy Adaptive-CUSUM Process");
+SHELL_COMMAND(sadcusum_command,
+              "sadcusum",
+              "sadcusum: Starts sleepy adaptive-CUSUM process",
+              &shell_sleepy_adcusum_process);
 
 PROCESS(shell_prechange_distribution_process, "Pre-change Process");
 SHELL_COMMAND(predist_command,
@@ -120,18 +130,16 @@ PROCESS_THREAD(shell_sleepy_cusum_process, ev, data)
 	PROCESS_BEGIN();
 	
 	static struct etimer etimer;
+	leds_off(LEDS_ALL);
 
 	// Other parameters
 	static uint16_t alpha = 1; // ==alpha/1000
 	static uint16_t beta = 1; // == beta/1000
-	static uint16_t mu = 2000;
  
 	// Variables
 	static uint16_t change_occurred = 0;
 	static uint16_t sleep = 0;
-	static uint16_t sleep_counter = 0;
 	static int16_t S_n = 0;
-	static uint16_t change_led_counter = 0;
 	static int16_t z_k = 0;
 	static uint16_t sensor_value = 0;
 	
@@ -165,7 +173,7 @@ PROCESS_THREAD(shell_sleepy_cusum_process, ev, data)
 
 		if (post_term == 32767)
 			S_n = -32767;
-		else if (pre_term == 32767)
+		if (pre_term == 32767)
 			S_n = 32767;
 		printf("z_k = %d\nS_n = %d\n", z_k, S_n);
 
@@ -190,8 +198,8 @@ PROCESS_THREAD(shell_sleepy_cusum_process, ev, data)
 		}
 		else if (sleep)
 		{
-			printf("Sleep time = %d\n\n", -S_n / mu);
-			etimer_set(&etimer, CLOCK_SECOND * -S_n / mu);
+			printf("Sleep time = %d\n\n", -S_n / MU_VALUE);
+			etimer_set(&etimer, CLOCK_SECOND * -S_n / MU_VALUE);
 			leds_off(LEDS_RED);
 			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
 			leds_on(LEDS_RED);
@@ -206,10 +214,93 @@ PROCESS_THREAD(shell_sleepy_cusum_process, ev, data)
 	PROCESS_END();
 }
 
+PROCESS_THREAD(shell_sleepy_adcusum_process, ev, data)
+{
+	PROCESS_BEGIN();
+	
+	static struct etimer etimer;
+	leds_off(LEDS_ALL);
+
+	// delta and epsilon are arbitrarily chosen. They affect how quickly
+	// the cusum algorithm converges, as well as how noisy it is
+	uint16_t delta = 1;
+	uint16_t epsilon = 1;
+	
+	// phi_min and phi_max define the range of possible readings
+	uint16_t phi_min = 0;
+	uint16_t phi_max = 4096;
+	static uint16_t phi_hat_a;
+	phi_hat_a = mean_0 - delta/2;
+	static uint16_t phi_hat_b;
+	phi_hat_b = mean_0 + delta/2;
+	static uint16_t phi_hat = 0;
+	
+	// Standard CUSUM variables, with b arbitrarily chosen
+	static int16_t S_n = 0;
+	static int16_t minS_n = 0;
+	static uint8_t b = 80;
+
+	static uint16_t change_occurred = 0;
+	static uint8_t movement_detected = 0;
+	static uint16_t sleep = 0;
+	static uint16_t sensor_value = 0;
+	static uint16_t change_counter = 0;
+
+	sensor_init();
+	etimer_set(&etimer, CLOCK_SECOND/16);
+	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+	while (1)
+	{
+		sensor_value = sensor_read();
+	
+		int16_t D_k = mypow2(sensor_value - phi_hat_a)/2 - mypow2(sensor_value - phi_hat_b)/2;
+
+		phi_hat_a = phi_hat_a + epsilon * D_k;
+		phi_hat_b = phi_hat_a + delta;
+
+		phi_hat = phi_hat_a + 0.5 * delta;
+		if (phi_hat > phi_max)
+			phi_hat = phi_max;
+		else if (phi_hat < phi_min)
+			phi_hat = phi_min;
+
+		int16_t z_k = mypow2(sensor_value - mean_0)/2 - mypow2(sensor_value - phi_hat)/2;
+		if (ZK_BOUND * -1 < z_k && z_k < ZK_BOUND) z_k = 0;	
+
+		S_n = S_n + z_k;
+
+		if (S_n >= (minS_n + b))
+			change_occurred = 1;
+		else if (S_n < minS_n)
+			minS_n = S_n;
+	
+		if (change_occurred && change_counter <= 250)
+		{
+			change_counter++;
+			leds_on(LEDS_RED);
+		} else if (change_occurred && change_counter > 250)
+		{
+			change_counter = 0;
+			change_occurred = 0;
+			S_n = 0;
+			minS_n = 0;
+			leds_off(LEDS_RED);
+		}
+
+		if (D_k < DK_BOUND * -1 || DK_BOUND < D_k) leds_on(LEDS_BLUE);
+		else leds_off(LEDS_BLUE);
+	
+		etimer_set(&etimer, CLOCK_SECOND/100);
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+	}
+	PROCESS_END();
+}
+	
 /*---------------------------------------------------------------------------*/
 void shell_sleepy_cusum_init()
 {
 	shell_register_command(&scusum_command);
+	shell_register_command(&sadcusum_command);
 	shell_register_command(&predist_command);
 	shell_register_command(&postdist_command);
 }
