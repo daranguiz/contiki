@@ -1,21 +1,14 @@
-#include "pingback.h"
+#include "pingnode.h"
+#include "dev/light-sensor.h"
 
 #define SINK_NODE 1
 #define NUM_HISTORY_ENTRIES 4
 #define MAX_RETRANSMISSIONS 4
 /*---------------------------------------------------------------------------*/
-PROCESS(pingback_process, "Pingback Process");
+PROCESS(pingnode_process, "Pingnode Process");
+PROCESS(open_connection_process, "Open Connection Process");
 
-//PROCESS(open_connection_process, "Open Connection Process");
-
-PROCESS(sink_handler_process, "Sink Handler Process");
-SHELL_COMMAND(ping_command,
-              "ping-node",
-              "ping-node: pings the given node, only used by matlab",
-              &sink_handler_process);
-
-PROCESS(ping_init_process, "Ping init process");
-AUTOSTART_PROCESSES(&ping_init_process);
+AUTOSTART_PROCESSES(&open_connection_process);
 
 /*---------------------------------------------------------------------------*/
 LIST(history_table);
@@ -52,23 +45,10 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 	
 	uint16_t cur_time = clock_time()/CLOCK_SECOND;
 
-//	printf("%d\n%d\n%s\n", from->u8[0], cur_time, (char *)packetbuf_dataptr());
-
 	/* Receiving a message triggers the next process in the sequence to begin */
 	
 	if (rimeaddr_node_addr.u8[0] != SINK_NODE)
-	{
-		process_start(&pingback_process, NULL);
-	} else {
-		char received_string[10];
-		strcpy(received_string, packetbuf_dataptr());
-		uint8_t counter = 0;
-		for (counter = 0; counter < 10; counter++)
-			if (received_string[counter] == '!') break;
-		for (counter; counter < 10; counter++)
-			received_string[counter] = '\0';
-		printf("DATA %d %d %s\n", from->u8[0], cur_time, received_string);
-	}
+		process_start(&pingnode_process, NULL);
 }
 
 static void
@@ -115,33 +95,16 @@ void close_runicast(void)
 }
 
 /*---------------------------------------------------------------------------*/
-/*PROCESS_THREAD(open_connection_process, ev, data)
+PROCESS_THREAD(open_connection_process, ev, data)
 {
 	PROCESS_BEGIN();
 	
 	open_runicast();
 	
 	PROCESS_END();
-}*/
-
-PROCESS_THREAD(ping_init_process, ev, data)
-{
-	PROCESS_BEGIN();
-	
-	serial_shell_init();
-	shell_blink_init();
-	shell_reboot_init();	
-	shell_rime_init();
-//	shell_rime_netcmd_init();
-	shell_text_init();
-	shell_time_init();
-	shell_sky_init();
-	shell_pingback_matlab_init();
-
-	PROCESS_END();
 }
 
-PROCESS_THREAD(pingback_process, ev, data)
+PROCESS_THREAD(pingnode_process, ev, data)
 {
 	PROCESS_BEGIN();
 	
@@ -149,11 +112,11 @@ PROCESS_THREAD(pingback_process, ev, data)
 	static char message[4];
 	
 	etimer_set(&etimer, CLOCK_SECOND/16);
-	sensor_init();
+	SENSORS_ACTIVATE(light_sensor);
 	leds_on(LEDS_ALL);
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
-	itoa(sensor_read(), message, 10);
-	sensor_uinit();
+	itoa(light_sensor.value(LIGHT_SENSOR_PHOTOSYNTHETIC), message, 10);
+	SENSORS_DEACTIVATE(light_sensor);
 	strcat(message, "!\0");
 
 	transmit_runicast(message, SINK_NODE);
@@ -161,21 +124,4 @@ PROCESS_THREAD(pingback_process, ev, data)
 
 	PROCESS_END();
 }
-
-PROCESS_THREAD(sink_handler_process, ev, data)
-{
-	PROCESS_BEGIN();
-	
-	uint8_t next_node = atoi(strtok(data, " "));
-	transmit_runicast("PING", next_node);
-
-	PROCESS_END();
-}
-
 /*---------------------------------------------------------------------------*/
-
-void shell_pingback_matlab_init()
-{
-	open_runicast();
-	shell_register_command(&ping_command);
-}

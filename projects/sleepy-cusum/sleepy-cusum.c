@@ -23,7 +23,7 @@ PROCESS_THREAD(gaussian_cusum_process, ev, data) {
 	shell_blink_init();
 	shell_reboot_init();
 	shell_rime_init();
-	shell_rime_netcmd_init();
+//	shell_rime_netcmd_init();
 	shell_text_init();
 	shell_time_init();
 	shell_sky_init();
