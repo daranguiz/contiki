@@ -1,6 +1,8 @@
 #include "pingback.h"
+#include "dev/cc2420.h"
 
-#define SINK_NODE 1
+#define RSSI 1
+#define SINK_NODE 5
 #define NUM_HISTORY_ENTRIES 4
 #define MAX_RETRANSMISSIONS 4
 /*---------------------------------------------------------------------------*/
@@ -59,6 +61,7 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 	if (rimeaddr_node_addr.u8[0] != SINK_NODE)
 	{
 		process_start(&pingback_process, NULL);
+		packetbuf_clear();
 	} else {
 		char received_string[10];
 		strcpy(received_string, packetbuf_dataptr());
@@ -67,7 +70,12 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 			if (received_string[counter] == '!') break;
 		for (counter; counter < 10; counter++)
 			received_string[counter] = '\0';
+		#if RSSI	
+		printf("RSSI = %d\nTX_POWER=%s\n\n", packetbuf_attr(PACKETBUF_ATTR_RSSI), received_string);
+		#else
 		printf("DATA %d %d %s\n", from->u8[0], cur_time, received_string);
+		#endif	
+		packetbuf_clear();
 	}
 }
 
@@ -147,6 +155,25 @@ PROCESS_THREAD(pingback_process, ev, data)
 	
 	static struct etimer etimer;
 	static char message[4];
+	static char power_str[4];
+	static uint8_t power_level[8] = {31, 27, 23, 19, 15, 11, 7, 3};
+
+	#if RSSI
+	
+	static int i = 0;
+	leds_on(LEDS_ALL);
+	for (i = 0; i < 8; i++)
+	{
+		cc2420_set_txpower(power_level[i]);
+		itoa(power_level[i], power_str, 10);
+		strcat(power_str, "!\0");
+		transmit_runicast(power_str, SINK_NODE);
+		etimer_set(&etimer, CLOCK_SECOND/2);
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+	}
+	leds_off(LEDS_ALL);
+	
+	#else	
 	
 	etimer_set(&etimer, CLOCK_SECOND/16);
 	sensor_init();
@@ -155,9 +182,11 @@ PROCESS_THREAD(pingback_process, ev, data)
 	itoa(sensor_read(), message, 10);
 	sensor_uinit();
 	strcat(message, "!\0");
-
+	
 	transmit_runicast(message, SINK_NODE);
 	leds_off(LEDS_ALL);
+	
+	#endif
 
 	PROCESS_END();
 }
