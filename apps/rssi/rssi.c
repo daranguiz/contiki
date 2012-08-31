@@ -14,7 +14,7 @@
 #include "net/rime/runicast.h"
 #include <string.h>
 
-#define SINK_NODE 1
+#define SINK_NODE 19
 #define TX_NODE 24
 #define RX_NODE 25
 
