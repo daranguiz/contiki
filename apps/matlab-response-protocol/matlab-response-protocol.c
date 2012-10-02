@@ -4,7 +4,7 @@
  */
 
 
-#include "sleepy-trilateration-matlab.h"
+#include "matlab-response-protocol.h"
 
 #define FIRST_NODE 9 
 #define LAST_NODE 15
@@ -14,12 +14,6 @@
 #define MAX_RETRANSMISSIONS 4
 
 /*---------------------------------------------------------------------------*/
-PROCESS(shell_sleepy_trilat_start_process, "Sleepy-Trilat Start Process");
-SHELL_COMMAND(sleepy_trilat_command,
-              "strilat",
-			  "strilat: begins sleepy tracking and trilateration",
-			  &shell_sleepy_trilat_start_process);
-
 PROCESS(node_read_process, "Node read process");
 
 PROCESS(sink_handler_process, "Sink handler process");
@@ -27,14 +21,13 @@ SHELL_COMMAND(sink_handler_command,
               "sink-send",
               "sink-send: used only by matlab - 'sink-send SLEEP_TIME NODE_ID'",
               &sink_handler_process);
-
-PROCESS(node_timeout_process, "Node timeout process");
 /*---------------------------------------------------------------------------*/
 LIST(history_table);
 MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
-static uint8_t my_node = 0;
 static uint16_t sleep_time = 0;
 static uint16_t my_noise = 0;
+static char *node_received_string = "\0";
+
 
 static void
 recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
@@ -73,8 +66,6 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 	
 	if (rimeaddr_node_addr.u8[0] != SINK_NODE)
 	{
-		sleep_time = atoi(packetbuf_dataptr());
-		process_exit(&node_timeout_process);
 		process_start(&node_read_process, NULL);
 	} else {
 		char received_string[10];
@@ -132,6 +123,177 @@ void close_runicast(void)
 }
 
 /*---------------------------------------------------------------------------*/
+static void
+broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
+{
+	process_start(&node_read_process, NULL);
+}
+
+static const struct broadcast_callbacks broadcast_call = {broadcast_recv};
+
+static struct broadcast_conn broadcast;
+
+int transmit_broadcast(char *message)
+{
+	packetbuf_copyfrom(message, strlen(message));
+	return broadcast_send(&broadcast);
+}
+
+void open_broadcast(void)
+{
+	broadcast_open(&broadcast, 129, &broadcast_call);
+}
+
+void close_broadcast(void)
+{
+	broadcast_close(&broadcast);
+}
+
+/*---------------------------------------------------------------------------*/
+int16_t parse_sleep_value(char *sleep_vector)
+{
+	/* String received will either be of the form "SINGLE sleep_time" or
+     * "VECTOR NODE 1 2 3 SLEEP 0 2 12"
+	 * From this, we want to pull the proper sleep information for the sensor
+	 */
+	if (strcmp(strtok(node_received_string, " "), "SINGLE"))
+		sleep_time = atoi(strtok(NULL, " "));
+	else 
+	{
+		char *cur_string;
+		cur_string = strtok(NULL, " "); // Done twice - once returns "NODE"
+		cur_string = strtok(NULL, " "); // Twice returns first node_id
+		uint8_t string_counter = 0;
+		int8_t my_id_counter = -1;
+		
+		while (!strcmp(cur_string, "SLEEP"))
+		{
+			if (atoi(cur_string) == rimeaddr_node_addr.u8[0])
+				my_id_counter = string_counter;
+			string_counter++;
+			cur_string = strtok(NULL, " ");
+		}
+		
+		if (my_id_counter != -1)
+		{
+			for (my_id_counter; my_id_counter >= 0; my_id_counter--);
+				cur_string = strtok(NULL, " ");
+			sleep_time = atoi(strtok(NULL, " "));
+		}
+		else sleep_time = -1;
+	}
+	return sleep_time;
+}
+
+PROCESS_THREAD(node_read_process, ev, data)
+{
+	PROCESS_BEGIN();
+
+	sleep_time = parse_sleep_value(node_received_string);
+
+	if (sleep_time != -1)
+	{	
+		static struct etimer etimer;
+		static int16_t sensor_value = 0;
+		static char message[3];
+		
+		etimer_set(&etimer, CLOCK_SECOND * sleep_time);
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+	
+		etimer_set(&etimer, CLOCK_SECOND/16);
+		leds_on(LEDS_ALL);
+		sensor_init();
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
+		sensor_value = sensor_read() - my_noise;
+		sensor_uinit();
+		itoa(sensor_value, message, 10);
+		strcat(message, "!\0");
+	
+		transmit_runicast(message, SINK_NODE);
+		leds_off(LEDS_ALL);
+	}
+
+	PROCESS_END();
+}
+
+/*Sends the sleep time to a certain node
+ *Syntax is either "sink-send SINGLE sleep_time node_id"
+ *Ex. "sink-send SINGLE 200 12"	
+ *Or
+ *"sink-sind VECTOR NODE {node_id's} SLEEP {sleep_times}"
+ *Ex. "sink-send VECTOR NODE 1 2 3 SLEEP 12 5 10" 
+ */
+PROCESS_THREAD(sink_handler_process, ev, data)
+{
+	PROCESS_BEGIN();
+
+	if (strcmp(strtok(data, " "), "SINGLE"))
+	{
+		uint8_t next_node = atoi(strtok(NULL, " "));
+		char *message = "SINGLE";
+		strcat(message, strtok(NULL, " "));
+		transmit_runicast(message, next_node);
+	}
+	else
+	{
+		transmit_broadcast(data);
+	}
+	
+	PROCESS_END();
+}	
+
+/*---------------------------------------------------------------------------*/
+void shell_matlab_response_protocol_init()
+{
+	open_runicast();
+	open_unicast();
+	open_broadcast();
+	shell_register_command(&sink_handler_command);
+}
+
+
+/*---------------------------------------------------------------------------*/
+/*
+ * Deprecated Processes
+
+
+PROCESS(node_timeout_process, "Node timeout process");
+
+PROCESS_THREAD(node_timeout_process, ev, data)
+{
+	PROCESS_BEGIN();
+	
+	while (1)
+	{
+		static struct etimer timeout;
+		int16_t sensor_value = 0;
+		static char message[3];
+
+		etimer_set(&timeout, CLOCK_SECOND * SLEEP_TIMEOUT);
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timeout));
+
+		etimer_set(&timeout, CLOCK_SECOND/16);
+		leds_on(LEDS_ALL);
+		sensor_init();
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timeout));
+		sensor_value = sensor_read() - my_noise;
+		sensor_uinit();
+		itoa(sensor_value, message, 10);
+		strcat(message, "!\0");
+	
+		transmit_runicast(message, SINK_NODE);
+		leds_off(LEDS_ALL);
+	}
+	
+	PROCESS_END();
+}
+
+PROCESS(shell_sleepy_trilat_start_process, "Sleepy-Trilat Start Process");
+SHELL_COMMAND(sleepy_trilat_command,
+              "strilat",
+			  "strilat: begins sleepy tracking and trilateration",
+			  &shell_sleepy_trilat_start_process);
+
 
 PROCESS_THREAD(shell_sleepy_trilat_start_process, ev, data)
 {
@@ -174,98 +336,4 @@ PROCESS_THREAD(shell_sleepy_trilat_start_process, ev, data)
 
 	PROCESS_END();
 }
-
-PROCESS_THREAD(node_read_process, ev, data)
-{
-	PROCESS_BEGIN();
-	
-	static struct etimer etimer;
-	static int16_t sensor_value = 0;
-	static char message[3];
-	
-	etimer_set(&etimer, CLOCK_SECOND * sleep_time);
-	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
-
-	etimer_set(&etimer, CLOCK_SECOND/16);
-	leds_on(LEDS_ALL);
-	sensor_init();
-	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
-	sensor_value = sensor_read() - my_noise;
-	sensor_uinit();
-	itoa(sensor_value, message, 10);
-	strcat(message, "!\0");
-
-	transmit_runicast(message, SINK_NODE);
-	leds_off(LEDS_ALL);
-	
-//	process_start(&node_timeout_process, NULL);
-	
-	PROCESS_END();
-}
-
-/*Sends the sleep time to a certain node
- *Syntax is "sink-send SLEEP_TIME NODE_ID"
- *Ex. "sink-send 200 12"	
- */
-PROCESS_THREAD(sink_handler_process, ev, data)
-{
-	PROCESS_BEGIN();
-
-	char *next_sleep_time;
-	next_sleep_time = strtok(data, " ");
-	uint8_t next_node = atoi(strtok(NULL, " "));
-	transmit_runicast(next_sleep_time, next_node);
-
-	PROCESS_END();
-}	
-
-PROCESS_THREAD(node_timeout_process, ev, data)
-{
-	PROCESS_BEGIN();
-	
-	while (1)
-	{
-		static struct etimer timeout;
-		int16_t sensor_value = 0;
-		static char message[3];
-
-		etimer_set(&timeout, CLOCK_SECOND * SLEEP_TIMEOUT);
-		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timeout));
-
-		etimer_set(&timeout, CLOCK_SECOND/16);
-		leds_on(LEDS_ALL);
-		sensor_init();
-		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timeout));
-		sensor_value = sensor_read() - my_noise;
-		sensor_uinit();
-		itoa(sensor_value, message, 10);
-		strcat(message, "!\0");
-	
-		transmit_runicast(message, SINK_NODE);
-		leds_off(LEDS_ALL);
-	}
-	
-	PROCESS_END();
-}	
-/*---------------------------------------------------------------------------*/
-void shell_sleepy_trilateration_matlab_init()
-{
-	open_runicast();
-	open_unicast();
-	shell_register_command(&sleepy_trilat_command);
-	shell_register_command(&sink_handler_command);
-}
-
-/* General steps for mote adaptation:
- * - Get sensor reading
- * - Concatenate it with the already present data string 
- * --- *Note, looks like this "100 101 483" etc
- * - Pass on new data string to next node
- * - At end, pass final data string to sink node
- * 
- * Sink node (start process in the init function so it runs on sink?):
- * - Parse string and pass data individually into array
- * - Calculations
- * - Flag iteration as complete
- * - Send command to continue data collection to the first node
- */
+*/
