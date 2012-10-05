@@ -16,7 +16,7 @@
 #include "net/rime.h"
 #include <string.h>
 
-extern void shell_matlab_response_protocol_init();
+void shell_matlab_response_protocol_init();
 
 int16_t parse_sleep_value(char *sleep_vector);
 

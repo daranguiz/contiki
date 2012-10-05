@@ -23,7 +23,7 @@ PROCESS_THREAD(matlab_sleep_respond_process, ev, data)
 	shell_sky_init();
 	shell_collect_view_init();
 
-	shell_matlab_reponse_protocol_init();
+	shell_matlab_response_protocol_init();
 
 	PROCESS_END();
 }
