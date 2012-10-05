@@ -25,7 +25,6 @@ SHELL_COMMAND(sink_handler_command,
 LIST(history_table);
 MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 static uint16_t sleep_time = 0;
-static uint16_t my_noise = 0;
 static char *node_received_string = "\0";
 
 
@@ -60,12 +59,14 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 	
 	uint16_t cur_time = clock_time()/CLOCK_SECOND;
 
-//	printf("%d\n%d\n%s\n", from->u8[0], cur_time, (char *)packetbuf_dataptr());
+	printf("Node receives: %d\n%d\n%s\n", from->u8[0], cur_time, (char *)packetbuf_dataptr());
 
 	/* Receiving a message triggers the next process in the sequence to begin */
 	
 	if (rimeaddr_node_addr.u8[0] != SINK_NODE)
 	{
+		node_received_string = (char *)packetbuf_dataptr();
+		printf("node_received_string = %s\n", node_received_string);
 		process_start(&node_read_process, NULL);
 	} else {
 		char received_string[10];
@@ -156,17 +157,27 @@ int16_t parse_sleep_value(char *sleep_vector)
      * "VECTOR NODE 1 2 3 SLEEP 0 2 12"
 	 * From this, we want to pull the proper sleep information for the sensor
 	 */
-	if (strcmp(strtok(node_received_string, " "), "SINGLE"))
+	int sleep_time = 0;
+
+	printf("I've entered the sleep time parsing function!\n received_string = %s\n", node_received_string);
+	
+	if (!strcmp(strtok(node_received_string, " "), "SINGLE"))
+	{
+		printf("It's a single thingamaboober!\n");
 		sleep_time = atoi(strtok(NULL, " "));
+	}
 	else 
 	{
 		char *cur_string;
+		printf("node_received_string inside parse function: %s\n", node_received_string);
 		cur_string = strtok(NULL, " "); // Done twice - once returns "NODE"
+		printf("cur_string should return NODE: %s\n", cur_string);
 		cur_string = strtok(NULL, " "); // Twice returns first node_id
+		printf("cur_string should return the first node_id: %s\n", cur_string);
 		uint8_t string_counter = 0;
 		int8_t my_id_counter = -1;
 		
-		while (!strcmp(cur_string, "SLEEP"))
+		while (strcmp(cur_string, "SLEEP") != 0)
 		{
 			if (atoi(cur_string) == rimeaddr_node_addr.u8[0])
 				my_id_counter = string_counter;
@@ -191,6 +202,8 @@ PROCESS_THREAD(node_read_process, ev, data)
 
 	sleep_time = parse_sleep_value(node_received_string);
 
+	printf("I've parsed a sleep time! Woo!\n");
+
 	if (sleep_time != -1)
 	{	
 		static struct etimer etimer;
@@ -204,7 +217,7 @@ PROCESS_THREAD(node_read_process, ev, data)
 		leds_on(LEDS_ALL);
 		sensor_init();
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etimer));
-		sensor_value = sensor_read() - my_noise;
+		sensor_value = sensor_read();
 		sensor_uinit();
 		itoa(sensor_value, message, 10);
 		strcat(message, "!\0");
@@ -227,18 +240,25 @@ PROCESS_THREAD(sink_handler_process, ev, data)
 {
 	PROCESS_BEGIN();
 
-	if (strcmp(strtok(data, " "), "SINGLE"))
+	char *input_string;
+	input_string = (char *) malloc(strlen(data));
+	strcpy(input_string, data);
+
+	if (!strcmp(strtok(data, " "), "SINGLE"))
 	{
 		uint8_t next_node = atoi(strtok(NULL, " "));
-		char *message = "SINGLE";
-		strcat(message, strtok(NULL, " "));
+		char message[20] = "SINGLE \0";
+		char *sleep = strtok(NULL, " ");
+		strcat(message, sleep);
 		transmit_runicast(message, next_node);
 	}
 	else
 	{
-		transmit_broadcast(data);
+		transmit_broadcast(input_string);
 	}
-	
+
+	free(input_string);
+		
 	PROCESS_END();
 }	
 
