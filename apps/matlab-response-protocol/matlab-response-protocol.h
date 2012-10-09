@@ -18,7 +18,7 @@
 
 void shell_matlab_response_protocol_init();
 
-int16_t parse_sleep_value(char *sleep_vector);
+int16_t parse_sleep_value();
 
 struct history_entry
 {

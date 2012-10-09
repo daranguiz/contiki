@@ -59,14 +59,13 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 	
 	uint16_t cur_time = clock_time()/CLOCK_SECOND;
 
-	printf("Node receives: %d\n%d\n%s\n", from->u8[0], cur_time, (char *)packetbuf_dataptr());
+	//printf("Node receives: %d\n%d\n%s\n", from->u8[0], cur_time, (char *)packetbuf_dataptr());
 
 	/* Receiving a message triggers the next process in the sequence to begin */
 	
 	if (rimeaddr_node_addr.u8[0] != SINK_NODE)
 	{
 		node_received_string = (char *)packetbuf_dataptr();
-		printf("node_received_string = %s\n", node_received_string);
 		process_start(&node_read_process, NULL);
 	} else {
 		char received_string[10];
@@ -127,6 +126,7 @@ void close_runicast(void)
 static void
 broadcast_recv(struct broadcast_conn *c, const rimeaddr_t *from)
 {
+	node_received_string = (char *)packetbuf_dataptr();
 	process_start(&node_read_process, NULL);
 }
 
@@ -151,7 +151,7 @@ void close_broadcast(void)
 }
 
 /*---------------------------------------------------------------------------*/
-int16_t parse_sleep_value(char *sleep_vector)
+int16_t parse_sleep_value()
 {
 	/* String received will either be of the form "SINGLE sleep_time" or
      * "VECTOR NODE 1 2 3 SLEEP 0 2 12"
@@ -159,37 +159,34 @@ int16_t parse_sleep_value(char *sleep_vector)
 	 */
 	int sleep_time = 0;
 
-	printf("I've entered the sleep time parsing function!\n received_string = %s\n", node_received_string);
-	
+	printf("node_received_string: %s\n", node_received_string);
+
 	if (!strcmp(strtok(node_received_string, " "), "SINGLE"))
 	{
-		printf("It's a single thingamaboober!\n");
 		sleep_time = atoi(strtok(NULL, " "));
 	}
 	else 
 	{
 		char *cur_string;
-		printf("node_received_string inside parse function: %s\n", node_received_string);
 		cur_string = strtok(NULL, " "); // Done twice - once returns "NODE"
-		printf("cur_string should return NODE: %s\n", cur_string);
 		cur_string = strtok(NULL, " "); // Twice returns first node_id
-		printf("cur_string should return the first node_id: %s\n", cur_string);
-		uint8_t string_counter = 0;
+		int8_t string_counter = 0;
 		int8_t my_id_counter = -1;
 		
 		while (strcmp(cur_string, "SLEEP") != 0)
 		{
-			if (atoi(cur_string) == rimeaddr_node_addr.u8[0])
+			if (atoi(cur_string) == rimeaddr_node_addr.u8[0]) {
 				my_id_counter = string_counter;
+			}
 			string_counter++;
 			cur_string = strtok(NULL, " ");
 		}
-		
+	
 		if (my_id_counter != -1)
 		{
-			for (my_id_counter; my_id_counter >= 0; my_id_counter--);
+			for (my_id_counter; my_id_counter >= 0; my_id_counter--)
 				cur_string = strtok(NULL, " ");
-			sleep_time = atoi(strtok(NULL, " "));
+			sleep_time = atoi(cur_string);
 		}
 		else sleep_time = -1;
 	}
@@ -200,9 +197,7 @@ PROCESS_THREAD(node_read_process, ev, data)
 {
 	PROCESS_BEGIN();
 
-	sleep_time = parse_sleep_value(node_received_string);
-
-	printf("I've parsed a sleep time! Woo!\n");
+	sleep_time = parse_sleep_value();
 
 	if (sleep_time != -1)
 	{	
