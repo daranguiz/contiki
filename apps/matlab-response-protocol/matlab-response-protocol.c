@@ -76,6 +76,7 @@ recv_runicast(struct runicast_conn *c, const rimeaddr_t *from, uint8_t seqno)
 		for (counter; counter < 10; counter++)
 			received_string[counter] = '\0';
 		printf("DATA %d %d %s\n", from->u8[0], cur_time, received_string);
+		packetbuf_clear();
 	}
 }
 
@@ -221,6 +222,8 @@ PROCESS_THREAD(node_read_process, ev, data)
 		leds_off(LEDS_ALL);
 	}
 
+	packetbuf_clear();
+
 	PROCESS_END();
 }
 
@@ -253,6 +256,8 @@ PROCESS_THREAD(sink_handler_process, ev, data)
 	}
 
 	free(input_string);
+	
+	packetbuf_clear();
 		
 	PROCESS_END();
 }	
